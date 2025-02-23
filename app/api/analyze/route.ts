@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: "api key will be added here",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 const SYSTEM_PROMPT = `You are a hiring a computer science for a developer position. 
