@@ -13,13 +13,14 @@ export default function ExtractPdfText() {
         
         setLoading(true);
         try {
-            const response = await fetch('/api/extract-text', {
+            const response = await fetch('/api/pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pdfUrl }),
             });
 
             const data = await response.json();
+            
             if (data.text) {
                 setText(data.text);
             } else {
