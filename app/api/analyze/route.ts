@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: "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",
+  // apiKey: "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",
 });
 
 const SYSTEM_PROMPT = `You are a hiring a computer science for a developer position. 
