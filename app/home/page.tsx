@@ -37,6 +37,8 @@ import {
 // table ends here
 
 import { Textarea } from "@/components/ui/textarea"
+
+import { toast } from "sonner"
   
 
 interface Job {
@@ -76,6 +78,37 @@ export default function home () {
     const [selectedJob, setSelectedJob] = React.useState<string>('')
     const [candidates, setCandidates] = React.useState<CandidateData[]>([])
     const [fetchingCandidates, setFetchingCandidates] = React.useState(false)
+    const [jobDescription, setJobDescription] = React.useState('')
+    const [analyzing, setAnalyzing] = React.useState(false)
+
+    const analyzeCandidates = async () => {
+        setAnalyzing(true);
+        try {
+            for (const candidateData of candidates) {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        candidate: candidateData.candidate,
+                        jobDescription: jobDescription
+                    })
+                });
+
+                if (!response.ok) throw new Error('Analysis failed');
+                
+                const data = await response.json();
+                console.log(`Analysis for ${candidateData.candidate.first_name} ${candidateData.candidate.last_name}:`, data.result);
+            }
+            toast.success('Analysis completed');
+        } catch (error) {
+            console.error('Analysis error:', error);
+            toast.error('Failed to analyze candidates');
+        } finally {
+            setAnalyzing(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -105,10 +138,10 @@ export default function home () {
             }
 
             setCandidates(filteredCandidates)
-            console.log('Fetched candidates:', filteredCandidates)
+            toast.success(`Found ${filteredCandidates.length} candidates for this position.`)
         } catch (error) {
             console.error('Error:', error)
-            alert('Failed to fetch candidates')
+            toast.error('Failed to fetch candidates')
         } finally {
             setFetchingCandidates(false)
         }
@@ -227,14 +260,17 @@ export default function home () {
                                 <Textarea 
                                     placeholder="Type your job description here." 
                                     className="min-h-[200px]"
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
                                 />
 
                                 <Button 
-                                    type="submit" 
+                                    type="button" 
                                     className="w-full mt-4 bg-[#2CB46D] text-white hover:bg-[#1D9A5E]"
-                                    disabled={fetchingCandidates}
+                                    disabled={fetchingCandidates || analyzing || jobDescription.length < 20}
+                                    onClick={analyzeCandidates}
                                 >
-                                    {fetchingCandidates ? 'Analysing Candidates...' : 'Analyse Candidates'}
+                                    {analyzing ? 'Analyzing Resumes...' : 'Analyze Candidates'}
                                 </Button>
                             </form>
                         </div>
