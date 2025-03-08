@@ -5,7 +5,7 @@ export async function POST(request: Request) {
   try {
     const { pdfUrl } = await request.json();
     
-    console.log('Processing PDF from URL:', pdfUrl);
+    // console.log('Processing PDF from URL:', pdfUrl);
 
     // Fetch the PDF file
     const response = await fetch(pdfUrl);
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer)
 
-    console.log(`PDF fetched successfully, size: ${buffer.length} bytes`);
+    // console.log(`PDF fetched successfully, size: ${buffer.length} bytes`);
 
     const pdfParser = new (PDFParser as any)(null, 1);
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
       pdfParser.on('pdfParser_dataReady', () => {
         const text = pdfParser.getRawTextContent();
-        console.log(`PDF parsed successfully, extracted text length: ${text.length} characters`);
+        // console.log(`PDF parsed successfully, extracted text length: ${text.length} characters`);
         resolve(text);
       });
 

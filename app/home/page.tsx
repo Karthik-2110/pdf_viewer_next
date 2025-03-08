@@ -45,6 +45,8 @@ import { Badge } from "@/components/ui/badge"
 import { MapPinIcon, BriefcaseIcon, BuildingIcon, ClockIcon, FileIcon, EnvelopeIcon } from "@/components/icons"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { DatePickerWithRange } from "@/components/ui/date-picker-with-range"
+import { DateRange } from "react-day-picker"
 
 interface Job {
     slug: string;
@@ -180,11 +182,18 @@ interface CandidateData {
     };
 }
 
+const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
+const RECRUIT_CRM_BASE_URL = 'https://api.recruitcrm.io/v1';
+
 export default function Home() {
-    const [date, setDate] = React.useState<Date>()
+    const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+        from: undefined,
+        to: undefined,
+    })
     const [jobs, setJobs] = React.useState<Job[]>([])
     const [loading, setLoading] = React.useState(false)
     const [selectedJob, setSelectedJob] = React.useState<string>('')
+    const [selectedJobInfo, setSelectedJobInfo] = React.useState<string>('')
     const [candidates, setCandidates] = React.useState<ProcessedCandidate[]>([])
     const [fetchingCandidates, setFetchingCandidates] = React.useState(false)
     const [jobDescription, setJobDescription] = React.useState<string>('')
@@ -196,6 +205,10 @@ export default function Home() {
     const [recipientEmail, setRecipientEmail] = React.useState<string>('');
     const [emailSent, setEmailSent] = React.useState(false);
 
+    const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
+        setDateRange(newDateRange)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedJob) {
@@ -205,22 +218,48 @@ export default function Home() {
 
         try {
             setFetchingCandidates(true)
-            console.log('Job Description:', jobDescription);
-            const response = await fetch(`/api/candidates?jobSlug=${selectedJob}`)
+
+            // Fetch selected job details based on jobSlug
+            // console.log(RECRUIT_CRM_API_KEY)
+           
+            const jobDetailsResponse = await fetch(`${RECRUIT_CRM_BASE_URL}/jobs/${selectedJob}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}` }
+            });
+
+            const jobDetails = await jobDetailsResponse.json();
+            setSelectedJobInfo(jobDetails)
+        
+            // console.log(selectedJobInfo)
+            
+            // Construct API URL with date range parameters
+            const apiUrl = new URL('/api/candidates', window.location.origin);
+            apiUrl.searchParams.set('jobSlug', selectedJob);
+            
+            // Add date range parameters if both from and to dates are available
+            if (dateRange?.from && dateRange?.to) {
+                // Use the original dates without converting to UTC
+                // This preserves the local timezone information
+                apiUrl.searchParams.set('fromDate', dateRange.from.toISOString());
+                apiUrl.searchParams.set('toDate', dateRange.to.toISOString());
+            }
+
+            const response = await fetch(apiUrl.toString())
             
             if (!response.ok) {
                 throw new Error('Failed to fetch candidates')
             }
 
             const data = await response.json()
-            let filteredCandidates = data.data || []
 
+            const initialCandidates = data.data || []
+            
             // Process each candidate and extract resume text
             const processCandidates = async () => {
                 const candidatesWithResumes: ProcessedCandidate[] = [];
                 
-                for (let index = 0; index < filteredCandidates.length; index++) {
-                    const candidateData = filteredCandidates[index];
+                for (let index = 0; index < initialCandidates.length; index++) {
+                    const candidateData = initialCandidates[index];
                     const candidateInfo: ProcessedCandidate = {
                         // Basic info
                         id: candidateData.candidate.id,
@@ -321,19 +360,13 @@ export default function Home() {
             // Execute the async function to process candidates
             const processedCandidates = await processCandidates();
 
-            // Filter candidates by date if selected
-            if (date) {
-                const selectedDate = format(date, 'yyyy-MM-dd')
-                const filteredByDate = processedCandidates.filter((candidateData: ProcessedCandidate) => {
-                    const candidateDate = format(new Date(candidateData.createdOn), 'yyyy-MM-dd')
-                    return candidateDate === selectedDate
-                })
-                setCandidates(filteredByDate)
-            } else {
-                setCandidates(processedCandidates)
+            // Set job description from the API response
+            if (initialCandidates.length > 0 && initialCandidates[0].job_description_text) {
+                setJobDescription(initialCandidates[0].job_description_text);
             }
 
-            console.log('Fetched candidates:', processedCandidates)
+            // Set candidates directly from the API response
+            setCandidates(processedCandidates)
         } catch (error) {
             console.error('Error:', error)
             alert('Failed to fetch candidates')
@@ -359,12 +392,12 @@ export default function Home() {
 
             for (let i = 0; i < updatedCandidates.length; i++) {
                 const candidate = updatedCandidates[i];
+                // console.log(candidate)
+                // console.log(selectedJob)
+
                 
                 if (candidate.resumeText) {
                     try {
-                        console.log(`Analyzing resume for ${candidate.name} with job description:`, 
-                            jobDescription.substring(0, 50) + (jobDescription.length > 50 ? '...' : ''));
-                        
                         const analyzeResponse = await fetch('/api/analyze', {
                             method: 'POST',
                             headers: {
@@ -372,7 +405,14 @@ export default function Home() {
                             },
                             body: JSON.stringify({
                                 text: candidate.resumeText,
-                                jobDescription: jobDescription
+                                jobDescription: jobDescription,
+                                jobSlug: selectedJob,
+                                candidateSlug: candidate.slug,
+                                skills: candidate.skills[0],
+                                specialization: candidate.specialization,
+                                salary_expectation: candidate.salary_expectation,
+                                current_salary: candidate.current_salary,
+                                selectedJobInfo: selectedJobInfo
                             }),
                         });
                         
@@ -395,7 +435,6 @@ export default function Home() {
                 }
             }
 
-            console.log('Candidates with analysis:', updatedCandidates);
             setCandidates(updatedCandidates);
         } catch (error) {
             console.error('Error analyzing candidates:', error);
@@ -438,7 +477,6 @@ export default function Home() {
             
             if (response.ok) {
                 setEmailSent(true);
-                console.log('Email sent successfully');
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to send email');
@@ -457,7 +495,6 @@ export default function Home() {
             const response = await fetch('/api/jobs');
             if (!response.ok) throw new Error('Failed to fetch jobs');
             const data = await response.json();
-            console.log(data)
             setJobs(data.data || []);
         } catch (error) {
             console.error('Error fetching jobs:', error);
@@ -513,28 +550,9 @@ export default function Home() {
                                     </Select>
                                 </div>
                                 <div className="w-full">
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                    "justify-start text-left font-normal w-full",
-                                                    !date && "text-muted-foreground"
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                            <Calendar
-                                                mode="single"
-                                                selected={date}
-                                                onSelect={setDate}
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
+                                    <DatePickerWithRange 
+                                        onDateRangeChange={handleDateRangeChange} 
+                                    />
                                 </div>
                             </div>
                             <Button 
@@ -559,12 +577,23 @@ export default function Home() {
                                     <p className={styles.selector_sub_text}>Set recruitment rules and guidelines for your candidates</p>
                                 </div>
 
-                                <Textarea 
-                                    placeholder="Type your job description here." 
-                                    className="min-h-[200px]"
-                                    value={jobDescription}
-                                    onChange={(e) => setJobDescription(e.target.value)}
-                                />
+                                <div className="mb-4">
+                                    <label htmlFor="jobDescription" className="block text-sm font-medium text-gray-700 mb-2">
+                                        Job Description
+                                    </label>
+                                    <textarea
+                                        id="jobDescription"
+                                        value={jobDescription}
+                                        onChange={(e) => setJobDescription(e.target.value)}
+                                        placeholder="Enter detailed job requirements, skills, and responsibilities. Each point on a new line helps in better candidate matching."
+                                        rows={5}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 bg-white p-3 text-gray-800 border border-gray-300"
+                                    />
+                                    <p className="mt-2 text-xs text-gray-500">
+                                        Tip: Be specific about required skills, experience, and job responsibilities. 
+                                        Each new line will help our AI better match candidates.
+                                    </p>
+                                </div>
 
                                 <Button 
                                     type="submit" 
