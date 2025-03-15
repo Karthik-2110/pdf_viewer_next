@@ -10,6 +10,16 @@
   }
 } */
 
+/* Add to your global CSS */
+.recharts-tooltip-cursor {
+  display: none !important;
+}
+
+.recharts-rectangle.recharts-bar-rectangle:hover {
+  filter: brightness(1.2) !important;
+  /* This brightens the bar slightly on hover instead of showing a white background */
+}
+
 
 
 @layer base {

@@ -4,6 +4,22 @@ import fetch from 'node-fetch';
 const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
 const BASE_URL = 'https://api.recruitcrm.io/v1';
 
+interface StageData {
+  status_id: number;
+  label: string;
+  // Add other properties as needed
+}
+
+interface StagesResponse {
+  data: StageData[];
+  // Add other properties as needed
+}
+
+interface CandidateData {
+  data: any[];
+  // Add other properties as needed
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,22 +27,9 @@ export async function GET(request: Request) {
     const fromDate = searchParams.get('fromDate');
     const toDate = searchParams.get('toDate');
 
-    // Fetch candidate stages
-    const stagesResponse = await fetch(`${BASE_URL}/hiring-pipeline`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`
-      }
-    });
-    const stagesData = await stagesResponse.json();
-    console.log('Candidate Stages:', stagesData);
-
-    // console.log('API Route Params:', { 
-    //   jobSlug, 
-    //   fromDate, 
-    //   toDate,
-    //   apiKey: RECRUIT_CRM_API_KEY ? 'PRESENT' : 'MISSING' 
-    // });
+    // Define the target status IDs we want to filter by
+    const targetStatusIds = [1, 10]; // 1 = Assigned, 10 = Applied
+    console.log('Filtering by status IDs:', targetStatusIds);
 
     if (!jobSlug) {
       return NextResponse.json({ error: 'Job slug is required' }, { status: 400 });
@@ -47,9 +50,7 @@ export async function GET(request: Request) {
 
     // Log full job response details
     const jobResponseText = await jobResponse.text();
-    // console.log('Job Response Status:', jobResponse.status);
-    // console.log('Job Response Body:', jobResponseText);
-
+    
     if (!jobResponse.ok) {
       return NextResponse.json({ 
         error: 'Job not found', 
@@ -57,41 +58,44 @@ export async function GET(request: Request) {
       }, { status: 404 });
     }
 
-    // Now fetch assigned candidates for this job
-    const candidatesResponse = await fetch(`${BASE_URL}/jobs/${jobSlug}/assigned-candidates`, {
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`
+    // Create an array to store all candidates from both status IDs
+    let allCandidates: any[] = [];
+    
+    // Fetch candidates for each status ID
+    for (const statusId of targetStatusIds) {
+      // Build the URL with status_id as a query parameter
+      const url = new URL(`${BASE_URL}/jobs/${jobSlug}/assigned-candidates`);
+      url.searchParams.append('status_id', statusId.toString());
+      
+      // console.log(`Fetching candidates with status_id ${statusId} (${statusId === 1 ? 'Assigned' : 'Applied'})...`);
+      
+      const candidatesResponse = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`
+        }
+      });
+
+      if (!candidatesResponse.ok) {
+        console.warn(`Failed to fetch candidates with status_id ${statusId}: ${candidatesResponse.status} ${candidatesResponse.statusText}`);
+        continue; // Skip to the next status ID if this one fails
       }
-    });
 
-    // Log full candidates response details
-    const candidatesResponseText = await candidatesResponse.text();
-    // console.log('Candidates Response Status:', candidatesResponse.status);
-    // console.log('Candidates Response Body:', candidatesResponseText);
-
-    if (!candidatesResponse.ok) {
-      return NextResponse.json({ 
-        error: 'Failed to fetch candidates', 
-        details: candidatesResponseText 
-      }, { status: 500 });
+      const candidatesData = await candidatesResponse.json() as CandidateData;
+      
+      if (candidatesData.data && candidatesData.data.length > 0) {
+        console.log(`Found ${candidatesData.data.length} candidates with status_id ${statusId}`);
+        allCandidates = [...allCandidates, ...candidatesData.data];
+      } else {
+        console.log(`No candidates found with status_id ${statusId}`);
+      }
     }
 
-    // Parse the response
-    let data;
-    try {
-      data = JSON.parse(candidatesResponseText);
-    } catch (parseError) {
-      console.error('Failed to parse candidates response:', parseError);
-      return NextResponse.json({ 
-        error: 'Invalid response format', 
-        rawResponse: candidatesResponseText 
-      }, { status: 500 });
-    }
+    // console.log(`Total candidates found: ${allCandidates.length}`);
 
     // If no candidates found, return early
-    if (!data.data || data.data.length === 0) {
-      console.warn('No candidates found for job slug:', jobSlug);
+    if (allCandidates.length === 0) {
+      console.warn('No candidates found for job slug with specified status IDs:', jobSlug);
       return NextResponse.json({
         data: [] as any[],
         message: 'No candidates found'
@@ -99,7 +103,7 @@ export async function GET(request: Request) {
     }
 
     // Filter candidates by date range if both fromDate and toDate are provided
-    let filteredCandidates = data.data;
+    let filteredCandidates = allCandidates;
     if (fromDate && toDate) {
       // Set the time to the start of the day for fromDate
       const fromDateTime = new Date(fromDate);
@@ -109,38 +113,26 @@ export async function GET(request: Request) {
       const toDateTime = new Date(toDate);
       toDateTime.setHours(23, 59, 59, 999);
       
-      // console.log('Date Filtering Details:', {
-      //   fromDate: fromDateTime.toISOString(),
-      //   toDate: toDateTime.toISOString(),
-      //   candidates: data.data.length
-      // });
-
-      filteredCandidates = data.data.filter((item: any) => {
+      filteredCandidates = allCandidates.filter((item: any) => {
         const candidateCreatedOn = new Date(item.candidate.created_on);
         
-        // Detailed logging for each candidate
-        // console.log('Candidate Creation Check:', {
-        //   candidateId: item.candidate.id,
-        //   candidateCreatedOn: candidateCreatedOn.toISOString(),
-        //   fromDate: fromDateTime.toISOString(),
-        //   toDate: toDateTime.toISOString(),
-        //   inRange: candidateCreatedOn >= fromDateTime && candidateCreatedOn <= toDateTime
-        // });
-
         // Inclusive range check with full day consideration
         return candidateCreatedOn >= fromDateTime && candidateCreatedOn <= toDateTime;
       });
 
-      console.log('Filtered Candidates:', filteredCandidates.length);
+      console.log('Filtered by date range:', filteredCandidates.length);
     }
 
-    // Create a new response object with filtered data
-    const filteredData = {
-      ...data,
-      data: filteredCandidates
+    // Create a response object with filtered data
+    const responseData = {
+      data: filteredCandidates,
+      meta: {
+        total: filteredCandidates.length,
+        filtered_by_status: targetStatusIds
+      }
     };
     
-    return NextResponse.json(filteredData);
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Unexpected error fetching candidates:', error);
     return NextResponse.json({ 

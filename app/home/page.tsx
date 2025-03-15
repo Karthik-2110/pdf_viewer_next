@@ -42,7 +42,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { MapPinIcon, BriefcaseIcon, BuildingIcon, ClockIcon, FileIcon, EnvelopeIcon } from "@/components/icons"
+// import { MapPinIcon, BriefcaseIcon, BuildingIcon, ClockIcon, FileIcon, EnvelopeIcon } from "@/components/icons"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { DatePickerWithRange } from "@/components/ui/date-picker-with-range"

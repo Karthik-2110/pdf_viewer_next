@@ -27,7 +27,9 @@ export async function POST(request: Request) {
     // console.log('Job description provided:', !!jobDescription);
     
     const systemPrompt = `You are an expert hiring manager evaluating candidates for a position. 
-Analyze the candidate's information and resume against the job description and it should be strict and provide a detailed assessment in JSON format. The result should be either 'approved' or 'declined'. no reason or no other datas needed just return 'approved' or 'declined' in a json format - this should not change and no other datas needed`;
+Analyze the candidate's information and resume against the job description and it should be strict and provide a
+detailed assessment in JSON format. The result should be either 'approved' or 'declined'. no reason or no other datas
+needed just return 'approved' or 'declined' in a json format - this should not change and no other datas needed`;
 
     // console.log('Using system prompt for detailed analysis');
 
@@ -37,7 +39,7 @@ Analyze the candidate's information and resume against the job description and i
     // Process each candidate individually with a delay for thorough evaluation
     const completion = await openai.chat.completions.create({
       messages: [
-        { role: 'user', content: `${systemPrompt} Job Description: ${jobDescriptionText} Candidate Data: ${JSON.stringify(candidateData)}` }
+        { role: 'user', content: `${systemPrompt} Job Description: ${jobDescriptionText} Candidate Data: ${JSON.stringify(candidateData)} ${skills} ${specialization} ${salary_expectation} ${current_salary}` }
       ],
       model: "gpt-4-turbo",
       temperature: 0.7,
@@ -45,7 +47,7 @@ Analyze the candidate's information and resume against the job description and i
     });
 
     const resultJson = completion.choices[0]?.message?.content || '{"result": "declined"}';
-    console.log(resultJson)
+    console.log(completion)
     
     // console.log('Analysis result received');
     
