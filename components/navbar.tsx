@@ -7,8 +7,8 @@ import { BoltIcon, PlusIcon } from '@heroicons/react/24/solid'
 import { BoltIcon as BoltIconOutline } from '@heroicons/react/24/outline'
 import { SparklesIcon } from '@heroicons/react/24/solid'
 import { useState } from "react";
+import { useSession } from "next-auth/react"
 
-import { signIn } from "@/auth"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -176,6 +176,8 @@ const RECRUIT_CRM_BASE_URL = 'https://api.recruitcrm.io/v1';
 
 
 export default function Navbar() {
+    const { data: session } = useSession()
+    console.log(session)
   const [name, setName] = useState("Pedro Duarte");
   const [username, setUsername] = useState("@peduarte");
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
@@ -590,10 +592,10 @@ React.useEffect(() => {
 
             <Link href="/" className="flex flex-col">
               <span className="text-[#FAFAFA] font-semibold text-sm">
-                karthik
+              {session?.user?.name}
               </span>
               <span className="text-[#B4B4B4] text-sm">
-                karthik@humanx.io
+              {session?.user?.email}
               </span>
             </Link>
           </div>
