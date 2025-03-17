@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { DatePickerWithRange } from "@/components/ui/date-picker-with-range"
 import { DateRange } from "react-day-picker"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -34,6 +33,7 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select"
+import { DatePickerWithRange } from "./ui/date-picker-with-range";
 
 
 interface Job {
@@ -198,6 +198,7 @@ const [analyzingCandidates, setAnalyzingCandidates] = React.useState(false);
 const [sendingEmail, setSendingEmail] = React.useState(false);
 const [recipientEmail, setRecipientEmail] = React.useState<string>('');
 const [emailSent, setEmailSent] = React.useState(false);
+const [sheetOpen, setSheetOpen] = React.useState(false)
 
 const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
     setDateRange(newDateRange)
@@ -361,6 +362,9 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         // Set candidates directly from the API response
         setCandidates(processedCandidates)
+        
+        // Close the sheet after successful fetch
+        setSheetOpen(false)
     } catch (error) {
         console.error('Error:', error)
         alert('Failed to fetch candidates')
@@ -501,6 +505,18 @@ React.useEffect(() => {
     fetchJobs();
 }, [])
 
+const handleSheetOpenChange = (open: boolean) => {
+  setSheetOpen(open)
+  // When sheet is closed, reset form values
+  if (!open) {
+    setSelectedJob('')
+    setDateRange({
+      from: undefined,
+      to: undefined,
+    })
+  }
+}
+
   return (
     <>
       <nav className="flex flex-row justify-between items-center p-4 bg-[#171717] border-b border-[#2E2E2E]">
@@ -522,7 +538,7 @@ React.useEffect(() => {
             // }}
             >
               
-              <Sheet>
+              <Sheet open={sheetOpen} onOpenChange={handleSheetOpenChange}>
                 <SheetTrigger asChild>
                   {/* <Button variant="outline">Open</Button> */}
                   <button className="bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center">
@@ -530,72 +546,96 @@ React.useEffect(() => {
                 Start analysis
               </button>
                 </SheetTrigger>
-                <SheetContent className="bg-[#171717] border-l border-[#2E2E2E] p-0">
+                <SheetContent className="bg-[#171717] border-l border-[#2E2E2E] p-0 w-[40%] max-w-[40%] sm:max-w-[40%] flex flex-col">
                   <SheetHeader className="p-4 border-b border-[#2E2E2E]">
                     <SheetTitle className="text-[#FAFAFA] text-lg font-medium">Start a new analysis</SheetTitle>
                     {/* <SheetDescription className="text-[#B4B4B4] text-sm">
                         Select a job role to start run an analysis
                     </SheetDescription> */}
                   </SheetHeader>
-                  <form onSubmit={handleSubmit} className="p-4">
-                            <div className='flex flex-col items-start mb-4'>
-                                {/* <h1 className="text-[#FAFAFA] text-lg font-medium">Job Selector</h1> */}
-                                <p className="text-[#B4B4B4] text-sm">Select a job to fetch candidates for</p>
-                            </div>
-                            <div className='flex flex-col items-start gap-4'>
-                                <div className='w-full'>
-                                    <Select
-                                        value={selectedJob}
-                                        onValueChange={setSelectedJob}
-                                        disabled={loading}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Select a job" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectGroup>
-                                                <SelectLabel>Jobs</SelectLabel>
-                                                {jobs.map((job) => (
-                                                    <SelectItem key={job.slug} value={job.slug}>
-                                                        {job.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectGroup>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="w-full">
-                                    <DatePickerWithRange 
-                                        onDateRangeChange={handleDateRangeChange} 
-                                    />
-                                </div>
-                            </div>
-                            <Button 
-                                type="submit" 
-                                className="w-full mt-4 bg-[#2CB46D] text-white hover:bg-[#1D9A5E]"
-                                disabled={fetchingCandidates || !selectedJob}
-                            >
-                                {fetchingCandidates ? 'Fetching Candidates...' : 'Fetch Candidates'}
-                            </Button>
-                        </form>
-                  <SheetFooter>
-                    <SheetClose asChild>
-                      <Button type="submit">Save changes</Button>
-                    </SheetClose>
-                  </SheetFooter>
+                  <form onSubmit={handleSubmit} className="flex flex-col flex-1 justify-between">
+                    <div className="p-4">
+                      <div className='flex flex-col items-start gap-4'>
+                          <div className='deaigner_wrapper w-full flex flex-row items-center'>
+                              <div className="flex flex-col items-start w-2/4">
+                                  <span className="text-[#FAFAFA] text-md font-semibold mb-1">Job role</span>
+                                  <p className="text-[#CECECE] text-sm">Select a job to fetch candidates for</p>
+                              </div>
+                              <Select
+                                  value={selectedJob}
+                                  onValueChange={setSelectedJob}
+                                  disabled={loading}
+                              >
+                                  <SelectTrigger className="w-2/4 bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-10">
+                                      <SelectValue placeholder="Select a job" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#B4B4B4] [&>*]:bg-[#1F1F1F]">
+                                      <SelectGroup className=" bg-[#1F1F1F]">
+                                          {jobs.map((job) => (
+                                              <SelectItem 
+                                                  key={job.slug} 
+                                                  value={job.slug} 
+                                                  className="bg-[#1F1F1F] text-[#CECECE] my-1 cursor-pointer hover:bg-[#2E2E2E] data-[highlighted]:bg-[#2E2E2E] data-[highlighted]:text-white rounded-md"
+                                              >
+                                                  {job.name}
+                                              </SelectItem>
+                                          ))}
+                                      </SelectGroup>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+
+                          <div className='date_wrapper w-full flex flex-row items-center mt-4'>
+                              <div className="flex flex-col items-start w-2/4">
+                                  <span className="text-[#FAFAFA] text-md font-semibold mb-1">Date range</span>
+                                  <p className="text-[#CECECE] text-sm">Select a time period to analyze</p>
+                              </div>
+                              <div className="w-2/4">
+                                  <DatePickerWithRange 
+                                      onDateRangeChange={handleDateRangeChange}
+                                      className="w-full"
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 mt-auto border-t border-[#2E2E2E] bg-[#171717] sticky bottom-0 w-full">
+                      <SheetClose asChild>
+                          <Button 
+                            type="submit" 
+                            className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center"
+                            disabled={fetchingCandidates || !selectedJob || !(dateRange?.from && dateRange?.to)}
+                          >
+                              {fetchingCandidates ? 'Fetching Candidates...' : 'Fetch Candidates'}
+                          </Button>
+                      </SheetClose>
+                      {(!selectedJob || !(dateRange?.from && dateRange?.to)) && !fetchingCandidates && (
+                        <p className="text-[#8A8A8A] text-xs mt-2 text-center">
+                          {!selectedJob ? 'Please select a job role' : 
+                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </form>
                 </SheetContent>
               </Sheet>
             </form>
           </div>
           <div className="profile_wrapper flex flex-row gap-2 items-center">
-            <div className="h-10 w-10 bg-[#1F1F1F] rounded-full"></div>
-
+                {session?.user?.image ? (
+                  <Image src={session.user.image} alt="Profile" width={40} height={40} className="rounded-full" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#2E2E2E] flex items-center justify-center text-[#FAFAFA]">
+                    {session?.user?.name ? session.user.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                )}
             <Link href="/" className="flex flex-col">
               <span className="text-[#FAFAFA] font-semibold text-sm">
-              {session?.user?.name}
+              {session?.user?.name || "User"}
               </span>
               <span className="text-[#B4B4B4] text-sm">
-              {session?.user?.email}
+              {session?.user?.email || "Not signed in"}
               </span>
             </Link>
           </div>

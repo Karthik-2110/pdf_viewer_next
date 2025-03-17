@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 
 export default function ApiKeyForm() {
   const [apiKey, setApiKey] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { data: session } = useSession();
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function ApiKeyForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!apiKey.trim() || !session?.user?.name) {
+    if (!apiKey.trim() || !session?.user?.email) {
       toast.error("Missing required information");
       return;
     }
@@ -27,9 +28,9 @@ export default function ApiKeyForm() {
       
       // Call the server action to save the username and API key
       const result = await saveApiKey(
-        session.user.name, 
+        session.user.email, 
         apiKey.trim(),
-        session.user.email || '' // Email is required by the function signature but not saved
+        organizationName
       );
 
       if (!result.success) {
@@ -69,7 +70,14 @@ export default function ApiKeyForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="input_wrapper flex flex-row items-center justify-between mt-6">
+      <Input
+          type="text"
+          value={organizationName}
+          onChange={(e) =>  setOrganizationName(e.target.value)}
+          className="mr-3 bg-[#1F1F1F] text-[#CECECE] border border-[#2E2E2E] rounded-md p-4 placeholder:text-[#B4B4B4] placeholder:text-sm focus:outline-[#148253] focus:border-[#148253] mt-6"
+          placeholder="Enter your organization name"
+        />
+      <div className="input_wrapper flex flex-row items-center justify-between mt-3">
         <Input
           type="text"
           value={apiKey}

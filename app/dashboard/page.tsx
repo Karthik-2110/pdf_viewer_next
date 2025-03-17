@@ -3,25 +3,15 @@
 import Navbar from "@/components/navbar";
 import { Bar, BarChart } from "recharts"
 
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { CartesianGrid, XAxis } from "recharts"
 import {
     ChartConfig,
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
+    ChartContainer
 } from "@/components/ui/chart"
 import { RocketLaunchIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import { SessionProvider } from "next-auth/react"
-
-// const chartData = [
-//     { month: "January", desktop: 186, mobile: 80 },
-//     { month: "February", desktop: 305, mobile: 200 },
-//     { month: "March", desktop: 237, mobile: 120 },
-//     { month: "April", desktop: 73, mobile: 190 },
-//     { month: "May", desktop: 209, mobile: 130 },
-//     { month: "June", desktop: 214, mobile: 140 },
-// ]
+import { SessionProvider, useSession } from "next-auth/react"
+import { getOrganizationData } from "../actions";
 
 const chartData = [
     { date: "2024-04-01", desktop: 222 },
@@ -46,22 +36,21 @@ const chartConfig = {
     },
 } satisfies ChartConfig
 
-// const chartConfig = {
-//     desktop: {
-//         label: "Desktop",
-//         color: "hsl(var(--chart-1))",
-//     },
-//     mobile: {
-//         label: "Mobile",
-//         color: "hsl(var(--chart-2))",
-//     },
-// } satisfies ChartConfig
 
 export default function Dashboard() {
     // Add state to track the hovered bar index
     const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
     const [displayValue, setDisplayValue] = useState<number>(0);
     const [displayDate, setDisplayDate] = useState<string>("");
+    const [orgName, setOrgName] = useState<string>("Organization");
+    const [credits, setCredits] = useState<number | string>(0);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const { data: session } = useSession();
+
+    // Log session data for debugging
+    useEffect(() => {
+        console.log("Session data:", session);
+    }, [session]);
 
     // Find the highest value in the chart data
     useEffect(() => {
@@ -71,6 +60,42 @@ export default function Dashboard() {
         setDisplayValue(highestValueItem.desktop);
         setDisplayDate(highestValueItem.date);
     }, []);
+
+    // Fetch organization data
+    useEffect(() => {
+        async function fetchOrgData() {
+            if (session?.user?.email) {
+                setIsLoading(true);
+                try {
+                    const result = await getOrganizationData(session.user.email);
+                    console.log("Organization data result:", result);
+                    
+                    if (result.success && result.data) {
+                        setOrgName(result.data.organization.organisation_name || "Organization");
+                        
+                        // Get total_credit from the credits object
+                        if (result.data.credits && result.data.credits.total_credit) {
+                            const creditValue = typeof result.data.credits.total_credit === 'string' 
+                                ? parseInt(result.data.credits.total_credit, 10) 
+                                : Number(result.data.credits.total_credit);
+                                
+                            console.log("Setting credits to:", creditValue, "Original value:", result.data.credits.total_credit);
+                            setCredits(isNaN(creditValue) ? 0 : creditValue);
+                        } else {
+                            console.log("No credits data found, setting to 0");
+                            setCredits(0);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error fetching organization data:", error);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        }
+        
+        fetchOrgData();
+    }, [session]);
 
     // Custom bar component to handle hover state
     const CustomBar = (props: any) => {
@@ -126,7 +151,7 @@ export default function Dashboard() {
 
                 <div className="dashbaord p-8">
                     <div className="org_wrapper flex flex-row items-end">
-                        <h1 className="text-[#FAFAFA] text-3xl mr-2">Humanx</h1>
+                        <h1 className="text-[#FAFAFA] text-3xl mr-2">{orgName}</h1>
                         <span className="text-white text-xs text-[#B4B4B4] pb-1">Overall stats of the hiring pipeline</span>
                     </div>
 
@@ -228,8 +253,10 @@ export default function Dashboard() {
                             </div>
 
                             <div className="quantify_value flex flex-col items-start mt-4">
-                                <span className="text-[#B4B4B4] text-md">We saved your</span>
-                                <span className="text-[#FAFAFA] text-lg">10 hours</span>
+                                <span className="text-[#B4B4B4] text-md">Available credits</span>
+                                <span className="text-[#FAFAFA] text-lg">
+                                    {isLoading ? "Loading..." : credits} credits
+                                </span>
                             </div>
                         </div>
 
