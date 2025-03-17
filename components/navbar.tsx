@@ -8,6 +8,7 @@ import { BoltIcon as BoltIconOutline } from '@heroicons/react/24/outline'
 import { SparklesIcon } from '@heroicons/react/24/solid'
 import { useState } from "react";
 import { useSession } from "next-auth/react"
+import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -180,10 +181,7 @@ export default function Navbar() {
     console.log(session)
   const [name, setName] = useState("Pedro Duarte");
   const [username, setUsername] = useState("@peduarte");
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
-    from: undefined,
-    to: undefined,
-})
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
 const [jobs, setJobs] = React.useState<Job[]>([])
 const [loading, setLoading] = React.useState(false)
 const [selectedJob, setSelectedJob] = React.useState<string>('')
@@ -510,10 +508,7 @@ const handleSheetOpenChange = (open: boolean) => {
   // When sheet is closed, reset form values
   if (!open) {
     setSelectedJob('')
-    setDateRange({
-      from: undefined,
-      to: undefined,
-    })
+    setDateRange(undefined)
   }
 }
 
@@ -575,7 +570,7 @@ const handleSheetOpenChange = (open: boolean) => {
                                               <SelectItem 
                                                   key={job.slug} 
                                                   value={job.slug} 
-                                                  className="bg-[#1F1F1F] text-[#CECECE] my-1 cursor-pointer hover:bg-[#2E2E2E] data-[highlighted]:bg-[#2E2E2E] data-[highlighted]:text-white rounded-md"
+                                                  className="bg-[#1F1F1F] text-[#CECECE] my-1 cursor-pointer hover:bg-[#2E2E2E] data-[highlighted]:bg-[#2E2E2E] data-[highlighted]:text-white rounded-md hover:text-[#CECECE]"
                                               >
                                                   {job.name}
                                               </SelectItem>
@@ -601,19 +596,20 @@ const handleSheetOpenChange = (open: boolean) => {
                     </div>
                     
                     <div className="p-4 mt-auto border-t border-[#2E2E2E] bg-[#171717] sticky bottom-0 w-full">
-                      <SheetClose asChild>
+                     
                           <Button 
+                          variant={"default"}
                             type="submit" 
-                            className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center"
+                            className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
                             disabled={fetchingCandidates || !selectedJob || !(dateRange?.from && dateRange?.to)}
                           >
                               {fetchingCandidates ? 'Fetching Candidates...' : 'Fetch Candidates'}
                           </Button>
-                      </SheetClose>
-                      {(!selectedJob || !(dateRange?.from && dateRange?.to)) && !fetchingCandidates && (
+                      {!fetchingCandidates && (
                         <p className="text-[#8A8A8A] text-xs mt-2 text-center">
                           {!selectedJob ? 'Please select a job role' : 
-                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' : ''}
+                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' : 
+                           `Fetching candidates from ${jobs.find(job => job.slug === selectedJob)?.name || selectedJob} from ${dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : ""} to ${dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : ""}`}
                         </p>
                       )}
                     </div>

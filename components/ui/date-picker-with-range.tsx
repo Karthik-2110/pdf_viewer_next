@@ -20,10 +20,13 @@ export function DatePickerWithRange({
 }: React.HTMLAttributes<HTMLDivElement> & { 
   onDateRangeChange?: (dateRange: DateRange | undefined) => void 
 }) {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: new Date(2022, 0, 20),
-    to: addDays(new Date(2022, 0, 20), 20),
-  })
+  // Get today's date
+  const today = new Date()
+  // Set initial date to current date (without time)
+  const currentDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  
+  // Initialize with undefined to keep fields empty by default
+  const [date, setDate] = React.useState<DateRange | undefined>(undefined)
 
   const handleDateSelect = (selectedDate: DateRange | undefined) => {
     setDate(selectedDate)
@@ -31,6 +34,9 @@ export function DatePickerWithRange({
       onDateRangeChange(selectedDate)
     }
   }
+
+  // Function to disable future dates
+  const disabledDays = { after: today }
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -40,7 +46,7 @@ export function DatePickerWithRange({
             id="date"
             variant={"outline"}
             className={cn(
-              "w-full h-10 justify-start text-left font-normal bg-[#1F1F1F] border-[#2E2E2E] text-[#CECECE] rounded-md hover:border-[#2CB46D] focus:border-[#2CB46D] focus:ring-[#2CB46D]",
+              "w-full h-10 justify-start text-left font-normal bg-[#1F1F1F] border-[#2E2E2E] text-[#CECECE] rounded-md hover:border-[#2CB46D] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:bg-[#1F1F1F] hover:text-[#CECECE]",
               !date && "text-[#8A8A8A]"
             )}
           >
@@ -63,11 +69,14 @@ export function DatePickerWithRange({
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={date?.from}
+            defaultMonth={currentDate}
             selected={date}
             onSelect={handleDateSelect}
             numberOfMonths={2}
+            disabled={disabledDays}
             className="bg-[#171717]"
+            fromDate={undefined}
+            toDate={today}
           />
         </PopoverContent>
       </Popover>
