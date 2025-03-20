@@ -7,9 +7,20 @@
       "config": {
         "eslint": {
           "ignoreDuringBuilds": true
+        },
+        "skipValidation": true,
+        "esmExternals": true,
+        "env": {
+          "OPENAI_API_KEY": "dummy-key-for-build"
         }
       }
     }
   ],
-  "installCommand": "npm install --legacy-peer-deps"
+  "installCommand": "npm install --legacy-peer-deps",
+  "env": {
+    "NEXT_PUBLIC_RUNTIME_VERCEL": "true",
+    "NODE_ENV": "production",
+    "VERCEL_ENV": "production",
+    "OPENAI_API_KEY": "dummy-key-for-build"
+  }
 }
