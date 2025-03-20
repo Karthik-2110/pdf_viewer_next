@@ -38,15 +38,10 @@ const eslintConfig = [
     ],
     rules: {
       // Disable rules that are causing issues
-      "@typescript-eslint/no-unused-vars": "warn", // Downgrade from error to warning
-      "@typescript-eslint/no-explicit-any": "off", // Completely disable any type check for Vercel deployment
-      "react-hooks/exhaustive-deps": "warn", // Downgrade from error to warning
-      "react/no-unescaped-entities": "off", // Turn off completely
-      
-      // If you want to completely disable rules, uncomment the lines below:
       "@typescript-eslint/no-unused-vars": "off", // Completely disable unused vars check
       "@typescript-eslint/no-explicit-any": "off", // Completely disable any type check
       "react-hooks/exhaustive-deps": "off", // Completely disable dependency array check
+      "react/no-unescaped-entities": "off", // Turn off completely
     },
   }
 ];

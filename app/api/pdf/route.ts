@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import PDFParser from 'pdf2json';
 
+// Define proper type for PDFParser constructor
+interface PDFParserConstructor {
+  new (pdfFilePath: string | null, pdfPassword?: number): PDFParser;
+}
+
+// Define error type based on library documentation
+interface PDFParserError {
+  parserError: Error;
+}
+
 export async function POST(request: Request) {
   try {
     const { pdfUrl } = await request.json();
@@ -23,12 +33,13 @@ export async function POST(request: Request) {
 
     // console.log(`PDF fetched successfully, size: ${buffer.length} bytes`);
 
-    const pdfParser = new (PDFParser as any)(null, 1);
+    // Cast PDFParser to the correct constructor type
+    const pdfParser = new (PDFParser as unknown as PDFParserConstructor)(null, 1);
 
     const parsedText = await new Promise((resolve, reject) => {
-      pdfParser.on('pdfParser_dataError', (errData: Error) => {
-        console.error('PDF parsing error:', errData.message);
-        reject(errData.message);
+      pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
+        console.error('PDF parsing error:', errData.parserError.message);
+        reject(errData.parserError.message);
       });
 
       pdfParser.on('pdfParser_dataReady', () => {
