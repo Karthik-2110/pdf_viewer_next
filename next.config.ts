@@ -6,10 +6,9 @@ const nextConfig: NextConfig = {
     domains: ['lh3.googleusercontent.com'],
   },
   
-  // ESLint configuration
+  // ESLint configuration for Vercel deployment
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
+    // This allows production builds to succeed despite ESLint errors
     ignoreDuringBuilds: true,
   },
 };
