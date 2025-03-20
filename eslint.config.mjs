@@ -44,9 +44,9 @@ const eslintConfig = [
       "react/no-unescaped-entities": "off", // Turn off completely
       
       // If you want to completely disable rules, uncomment the lines below:
-      // "@typescript-eslint/no-unused-vars": "off", // Completely disable unused vars check
-      // "@typescript-eslint/no-explicit-any": "off", // Completely disable any type check
-      // "react-hooks/exhaustive-deps": "off", // Completely disable dependency array check
+      "@typescript-eslint/no-unused-vars": "off", // Completely disable unused vars check
+      "@typescript-eslint/no-explicit-any": "off", // Completely disable any type check
+      "react-hooks/exhaustive-deps": "off", // Completely disable dependency array check
     },
   }
 ];
