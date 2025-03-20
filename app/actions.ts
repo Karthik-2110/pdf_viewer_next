@@ -87,7 +87,6 @@ export async function getOrganizationData(email: string) {
     const { data: orgData, error: orgError } = await supabase
       .from('Organisation')
       .select('id, organisation_name, email')
-      .eq('email', email)
       .single();
 
     if (orgError) {
@@ -100,7 +99,7 @@ export async function getOrganizationData(email: string) {
     // Get credits data for this organization
     const { data: creditsData, error: creditsError } = await supabase
       .from('Credits')
-      .select('total_credit, purchase_type, created_at, id')
+      .select('total_credit, purchase_type, created_at, id, email')
       .eq('id', orgData.id)
       .maybeSingle(); // Use maybeSingle instead of single to handle no rows case
 
