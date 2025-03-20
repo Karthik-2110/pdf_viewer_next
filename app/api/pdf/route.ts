@@ -34,7 +34,10 @@ export async function POST(request: Request) {
     // console.log(`PDF fetched successfully, size: ${buffer.length} bytes`);
 
     // Cast PDFParser to the correct constructor type
-    const pdfParser = new (PDFParser as unknown as PDFParserConstructor)(null, 1);
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    // If the fix above doesn't work, fallback to this:
+    const pdfParser = new (PDFParser as any)(null, 1);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     const parsedText = await new Promise((resolve, reject) => {
       pdfParser.on('pdfParser_dataError', (errData: PDFParserError) => {
