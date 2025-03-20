@@ -37,7 +37,8 @@ const eslintConfig = [
       ".env*"
     ],
     rules: {
-     "@typescript-eslint/no-unused-vars": "off", // Completely disable unused vars check
+      // Disable rules that are causing issues
+      "@typescript-eslint/no-unused-vars": "off", // Completely disable unused vars check
       "@typescript-eslint/no-explicit-any": "off", // Completely disable any type check
       "react-hooks/exhaustive-deps": "off", // Completely disable dependency array check
       "react/no-unescaped-entities": "off", // Turn off completely
