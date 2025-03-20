@@ -21,6 +21,14 @@
     "NEXT_PUBLIC_RUNTIME_VERCEL": "true",
     "NODE_ENV": "production",
     "VERCEL_ENV": "production",
-    "OPENAI_API_KEY": "dummy-key-for-build"
+    "OPENAI_API_KEY": "dummy-key-for-build",
+    "AUTH_SECRET": "dummy-auth-secret-for-build",
+    "AUTH_GOOGLE_ID": "dummy-google-id-for-build",
+    "AUTH_GOOGLE_SECRET": "dummy-google-secret-for-build",
+    "RECRUIT_CRM_API_KEY": "dummy-recruit-crm-key-for-build",
+    "RESEND_API_KEY": "dummy-resend-key-for-build",
+    "NEXT_PUBLIC_SUPABASE_URL": "dummy-supabase-url-for-build",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "dummy-supabase-anon-key-for-build",
+    "SUPABASE_SERVICE_ROLE_KEY": "dummy-supabase-service-key-for-build"
   }
 }
