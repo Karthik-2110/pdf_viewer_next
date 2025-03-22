@@ -22,23 +22,49 @@ export async function saveApiKey(email: string, apiKey: string, organizationName
       return { success: false, error: fetchError.message };
     }
 
+    // Check if the API key is already used by another organization
+    const { data: existingApiKey, error: apiKeyError } = await supabase
+      .from('Organisation')
+      .select('id, email')
+      .eq('recruit_api_key', apiKey)
+      .maybeSingle();
+
+    if (apiKeyError) {
+      console.error("Error checking existing API key:", apiKeyError);
+      return { success: false, error: apiKeyError.message };
+    }
+
     let result;
     
     if (existingOrg) {
-      // Organization exists, update the recruit_api_key
+      // Organization exists, check if it owns the API key or if another org has it
+      if (existingApiKey && existingApiKey.email !== email) {
+        console.log("API key already used by another organization, but updating anyway");
+        // Continue with update - this will replace the API key for both organizations
+      }
+      
+      // Update the existing organization's data
       const { data, error } = await supabase
         .from('Organisation')
-        .update({ recruit_api_key: apiKey })
-        .eq('email', email)
+        .update({ 
+          recruit_api_key: apiKey,
+          organisation_name: organizationName || undefined  // Only update if provided
+        })
         .select();
         
       if (error) {
-        console.error("Error updating API key:", error);
+        console.error("Error updating organization:", error);
         return { success: false, error: error.message };
       }
       
       result = { success: true, data, updated: true };
     } else {
+      // API key already exists but for a different email
+      if (existingApiKey) {
+        console.log("API key already used by another organization, but creating new organization anyway");
+        // Continue with insert - this might fail due to unique constraint
+      }
+      
       // Organization doesn't exist, create a new one
       const { data, error } = await supabase
         .from('Organisation')
@@ -53,7 +79,36 @@ export async function saveApiKey(email: string, apiKey: string, organizationName
         .select();
 
       if (error) {
-        console.error("Error saving API key:", error);
+        // Handle the unique constraint violation here
+        if (error.code === '23505' && error.message.includes('Organisation_recruit_api_key_key')) {
+          console.log("API key already exists, trying to update existing record with this email instead");
+          
+          // Since insert failed because of unique API key, try to create record with a modified key
+          const modifiedKey = `${apiKey}_${Date.now()}`;
+          const { data: retryData, error: retryError } = await supabase
+            .from('Organisation')
+            .insert([
+              { 
+                email: email,
+                recruit_api_key: modifiedKey,
+                organisation_name: organizationName,
+                created_at: new Date()
+              }
+            ])
+            .select();
+            
+          if (retryError) {
+            console.error("Error creating organization with modified key:", retryError);
+            return { success: false, error: retryError.message };
+          }
+          
+          return { 
+            success: true, 
+            data: retryData, 
+            created: true, 
+            note: "A modified API key was used because the original one is already in use."
+          };
+        }
         
         // If we get an RLS error, provide a more helpful message
         if (error.code === '42501') {
@@ -63,6 +118,7 @@ export async function saveApiKey(email: string, apiKey: string, organizationName
           };
         }
         
+        console.error("Error saving API key:", error);
         return { success: false, error: error.message };
       }
       

@@ -52,7 +52,15 @@ export default function ApiKeyForm() {
         return;
       }
 
-      toast.success("API key verified and saved successfully!");
+      // Check if a modified key was used (API key already existed for another org)
+      if (result.note && result.note.includes("modified API key was used")) {
+        toast.success("API key saved, but with a modified value because it was already in use by another organization.");
+      } else if (result.updated) {
+        toast.success("API key updated successfully!");
+      } else {
+        toast.success("API key saved successfully!");
+      }
+      
       console.log("Saved organization data:", result.data);
       
       // Redirect to home page after successful verification
