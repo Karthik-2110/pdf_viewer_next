@@ -420,14 +420,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         // Set candidates directly from the API response
         setCandidates(processedCandidates)
-        
-        // Only close the sheet if candidates were successfully fetched
-        if (processedCandidates.length > 0) {
-            // Close the sheet after a short delay to show the loaded candidates
-            setTimeout(() => {
-                setSheetOpen(false);
-            }, 1000);
-        }
     } catch (error) {
         console.error('Error:', error)
         alert('Failed to fetch candidates')
@@ -568,10 +560,21 @@ React.useEffect(() => {
     fetchJobs();
 }, [])
 
+// Add a new useEffect to scroll to candidates section after fetching
+React.useEffect(() => {
+    if (!fetchingCandidates && candidates.length > 0) {
+        // Find the candidates wrapper element and scroll to it
+        const candidatesSection = document.querySelector('.fetched_candidates_wrapper');
+        if (candidatesSection) {
+            candidatesSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+}, [fetchingCandidates, candidates]);
+
 const handleSheetOpenChange = (open: boolean) => {
   setSheetOpen(open)
-  // When sheet is closed, reset form values
-  if (!open) {
+  // Only reset values when opening the sheet and candidates are not already loaded
+  if (open && candidates.length === 0) {
     setSelectedJob('')
     setDateRange(undefined)
   }
@@ -658,6 +661,9 @@ const handleSheetOpenChange = (open: boolean) => {
                               </div>
                           </div>
 
+                          {/* Only show candidates section after fetch attempt */}
+                          {(fetchingCandidates || candidates.length > 0 || fetchedCandidatesCount !== null) && (
+                          <div>
                           <div className='fetched_candidates_wrapper w-full mt-4 border-t border-[#2E2E2E] p-4'>
                             <span className="text-[#FAFAFA] text-md font-semibold">
                               {fetchingCandidates 
@@ -680,9 +686,9 @@ const handleSheetOpenChange = (open: boolean) => {
                                   : 'Please select a job and date range to fetch candidates'}
                             </p>
                               <div className="candidates_list_wrapper w-full">
-                              <Table className="w-full p-0 m-0">
-                                    <TableHeader>
-                                        <TableRow>
+                              <Table className="w-full p-0 mt-4">
+                                    <TableHeader className="bg-[#1F1F1F] rounded-t-md">
+                                        <TableRow className="border-b border-[#2E2E2E] hover:bg-[#1F1F1F]">
                                         <TableHead className="text-[#B4B4B4] w-[250px]">Candidate</TableHead>
                                         <TableHead className="text-[#B4B4B4]">Status</TableHead>
                                         <TableHead className="text-[#B4B4B4]">Resume</TableHead>
@@ -693,14 +699,14 @@ const handleSheetOpenChange = (open: boolean) => {
                                             <TableRow>
                                                 <TableCell colSpan={4} className="text-center text-[#B4B4B4] py-8">
                                                     <div className="flex flex-col items-center justify-center gap-2">
-                                                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#00623A]"></div>
+                                                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-1 border-[#2CB46D]"></div>
                                                         <span>Loading candidates...</span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         ) : candidates.length > 0 ? (
                                             candidates.slice(0, 5).map((candidate) => (
-                                                <TableRow key={candidate.id} className="hover:bg-[#1F1F1F] cursor-pointer">
+                                                <TableRow key={candidate.id} className="hover:bg-[#1F1F1F] cursor-pointer mt-2">
                                                     <TableCell>
                                                         <div className="flex items-center gap-3">
                                                             {candidate.avatar ? (
@@ -784,6 +790,28 @@ const handleSheetOpenChange = (open: boolean) => {
                                 </Table>
                               </div>
                           </div>
+
+                          <div className='addional_wrapper flex flex-row w-full border-t border-[#2E2E2E] p-4'>
+                              <div className="flex flex-col items-start w-2/4">
+                                  <span className="text-[#FAFAFA] text-md font-semibold mb-1">Job description</span>
+                                  <p className="text-[#CECECE] text-sm">The job description from Recruit CRM is auto-fetched. Use this field for further refinement.</p>
+                              </div>
+                              <div className="w-2/4">
+                                  <Textarea
+                                    className={`w-full bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-32`}
+                                    placeholder="Enter analyses rules"
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
+                                    required
+                                  />
+                              </div>
+                          </div>
+                          
+                          </div>
+                          )}
+
+
+                          
                       </div>
                     </div>
                     
@@ -793,14 +821,15 @@ const handleSheetOpenChange = (open: boolean) => {
                           variant={"default"}
                             type="submit" 
                             className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
-                            disabled={fetchingCandidates || !selectedJob || !(dateRange?.from && dateRange?.to)}
+                            disabled={fetchingCandidates || !selectedJob || !(dateRange?.from && dateRange?.to) || (candidates.length > 0 && jobDescription.length < 15)}
                           >
-                              {fetchingCandidates ? 'Fetching Candidates...' : candidates.length > 0 ? 'Update Candidates' : 'Fetch Candidates'}
+                              {fetchingCandidates ? 'Fetching Candidates...' : candidates.length > 0 ? 'Analyse Candidates' : 'Fetch Candidates'}
                           </Button>
                       {!fetchingCandidates && (
                         <p className="text-[#8A8A8A] text-xs mt-2 text-center">
                           {!selectedJob ? 'Please select a job role' : 
-                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' : 
+                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' :
+                           candidates.length > 0 && jobDescription.length < 15 ? `Please enter at least ${15 - jobDescription.length} more character${15 - jobDescription.length !== 1 ? 's' : ''} in job description` :
                            candidates.length > 0 ? `${candidates.length} candidates fetched successfully` :
                            `Ready to fetch candidates for ${jobs.find(job => job.slug === selectedJob)?.name || selectedJob} from ${dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : ""} to ${dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : ""}`}
                         </p>
