@@ -99,6 +99,11 @@ interface Job {
   updated_on: string;
 }
 
+interface HiringStage {
+  status_id: number;
+  label: string;
+}
+
 interface ProcessedCandidate {
   // Basic info
   id: number;
@@ -227,20 +232,36 @@ interface CandidateData {
   };
 }
 
-const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
+// Removing the hardcoded API key
+// const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
 const RECRUIT_CRM_BASE_URL = 'https://api.recruitcrm.io/v1';
 
-
+// Function to fetch API key from the server
+const fetchApiKey = async (): Promise<string> => {
+  try {
+    const response = await fetch('/api/apikey');
+    if (!response.ok) {
+      console.error('Failed to fetch API key');
+      return '';
+    }
+    const data = await response.json();
+    return data.apiKey;
+  } catch (error) {
+    console.error('Error fetching API key:', error);
+    return '';
+  }
+};
 
 export default function Navbar() {
     const { data: session } = useSession()
-    console.log(session)
   const [name, setName] = useState("Pedro Duarte");
   const [username, setUsername] = useState("@peduarte");
   const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined)
 const [jobs, setJobs] = React.useState<Job[]>([])
+const [hiringStages, setHiringStages] = React.useState<HiringStage[]>([])
 const [loading, setLoading] = React.useState(false)
 const [selectedJob, setSelectedJob] = React.useState<string>('')
+const [selectedHiringStage, setSelectedHiringStage] = React.useState<string>('')
 const [selectedJobInfo, setSelectedJobInfo] = React.useState<string>('')
 const [candidates, setCandidates] = React.useState<ProcessedCandidate[]>([])
 const [fetchingCandidates, setFetchingCandidates] = React.useState(false)
@@ -254,6 +275,16 @@ const [sendingEmail, setSendingEmail] = React.useState(false);
 const [recipientEmail, setRecipientEmail] = React.useState<string>('');
 const [emailSent, setEmailSent] = React.useState(false);
 const [sheetOpen, setSheetOpen] = React.useState(false)
+const [apiKey, setApiKey] = React.useState<string>(''); // Store the API key
+
+// Fetch the API key when component mounts
+React.useEffect(() => {
+    const getApiKey = async () => {
+        const key = await fetchApiKey();
+        setApiKey(key);
+    };
+    getApiKey();
+}, []);
 
 const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
     setDateRange(newDateRange)
@@ -262,7 +293,13 @@ const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
 const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedJob) {
-        alert('Please select a job')
+        alert('Please select a job role')
+        return
+    }
+
+    // If candidates are already loaded, analyze them instead of fetching new ones
+    if (candidates.length > 0) {
+        analyzeCandidates()
         return
     }
 
@@ -271,44 +308,69 @@ const handleSubmit = async (e: React.FormEvent) => {
         setCandidates([]) // Clear previous candidates
         setFetchedCandidatesCount(null) // Reset count
 
+        // Get the API key if not already available
+        const currentApiKey = apiKey || await fetchApiKey();
+        if (!currentApiKey) {
+            throw new Error('API key not available');
+        }
+
         // Fetch selected job details based on jobSlug
-        // console.log(RECRUIT_CRM_API_KEY)
-       
         const jobDetailsResponse = await fetch(`${RECRUIT_CRM_BASE_URL}/jobs/${selectedJob}`, {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}` }
+            headers: { 'Authorization': `Bearer ${currentApiKey}` }
         });
+
+        if (!jobDetailsResponse.ok) {
+            throw new Error('Failed to fetch job details')
+        }
 
         const jobDetails = await jobDetailsResponse.json();
         setSelectedJobInfo(jobDetails)
     
-        // console.log(selectedJobInfo)
-        
-        // Construct API URL with date range parameters
+        // Construct API URL with parameters
         const apiUrl = new URL('/api/candidates', window.location.origin);
+        
+        // Add job slug (required)
         apiUrl.searchParams.set('jobSlug', selectedJob);
+        
+        // Add hiring stage if selected
+        if (selectedHiringStage) {
+            apiUrl.searchParams.set('hiringStage', selectedHiringStage);
+            console.log(`Filtering by hiring stage: ${selectedHiringStage}`);
+        }
         
         // Add date range parameters if both from and to dates are available
         if (dateRange?.from && dateRange?.to) {
-            // Use the original dates without converting to UTC
-            // This preserves the local timezone information
             apiUrl.searchParams.set('fromDate', dateRange.from.toISOString());
             apiUrl.searchParams.set('toDate', dateRange.to.toISOString());
+            console.log(`Filtering by date range: ${dateRange.from.toISOString()} to ${dateRange.to.toISOString()}`);
         }
 
+        console.log('Fetching candidates with URL:', apiUrl.toString());
+        
         const response = await fetch(apiUrl.toString())
         
         if (!response.ok) {
-            throw new Error('Failed to fetch candidates')
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Failed to fetch candidates: ${errorData.message || response.statusText}`);
         }
 
-        const data = await response.json()
+        const data = await response.json();
+        console.log('Received candidate data:', data);
 
-        const initialCandidates = data.data || []
-        setFetchedCandidatesCount(initialCandidates.length)
+        const initialCandidates = data.data || [];
+        setFetchedCandidatesCount(initialCandidates.length);
         
         // Process each candidate and extract resume text
         const processCandidates = async () => {
+            // Dispatch event to notify dashboard that fetching is complete and analysis may start soon
+            window.dispatchEvent(new CustomEvent('candidatesFetched', {
+                detail: {
+                    count: initialCandidates.length,
+                    jobName: jobs.find(job => job.slug === selectedJob)?.name || 'Selected Job',
+                }
+            }));
+            
             const candidatesWithResumes: ProcessedCandidate[] = [];
             
             for (let index = 0; index < initialCandidates.length; index++) {
@@ -420,14 +482,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 
         // Set candidates directly from the API response
         setCandidates(processedCandidates)
-        
-        // Only close the sheet if candidates were successfully fetched
-        if (processedCandidates.length > 0) {
-            // Close the sheet after a short delay to show the loaded candidates
-            setTimeout(() => {
-                setSheetOpen(false);
-            }, 1000);
-        }
     } catch (error) {
         console.error('Error:', error)
         alert('Failed to fetch candidates')
@@ -442,13 +496,18 @@ const analyzeCandidates = async () => {
         return;
     }
 
-    if (!jobDescription.trim()) {
-        alert('Please enter a job description');
-        return;
-    }
-
     try {
         setAnalyzingCandidates(true);
+        // Close the sheet before starting analysis
+        setSheetOpen(false);
+        
+        // Notify dashboard that analysis is starting
+        window.dispatchEvent(new CustomEvent('analysisStarted', {
+            detail: {
+                totalCandidates: candidates.length
+            }
+        }));
+        
         const updatedCandidates = [...candidates];
 
         for (let i = 0; i < updatedCandidates.length; i++) {
@@ -469,16 +528,17 @@ const analyzeCandidates = async () => {
                             jobDescription: jobDescription,
                             jobSlug: selectedJob,
                             candidateSlug: candidate.slug,
-                            skills: candidate.skills[0],
-                            specialization: candidate.specialization,
-                            salary_expectation: candidate.salary_expectation,
-                            current_salary: candidate.current_salary,
+                            skills: candidate.skills && candidate.skills.length > 0 ? candidate.skills[0] : '',
+                            specialization: candidate.specialization || '',
+                            salary_expectation: candidate.salary_expectation || '',
+                            current_salary: candidate.current_salary || '',
                             selectedJobInfo: selectedJobInfo
                         }),
                     });
                     
                     if (analyzeResponse.ok) {
                         const analyzeData = await analyzeResponse.json();
+                        console.log(`Analysis result for ${candidate.name}:`, analyzeData);
                         updatedCandidates[i] = {
                             ...candidate,
                             resumeAnalysis: {
@@ -489,6 +549,15 @@ const analyzeCandidates = async () => {
                                 coldEmail: analyzeData.coldEmail
                             }
                         };
+                        
+                        // Notify dashboard about progress
+                        window.dispatchEvent(new CustomEvent('candidateAnalyzed', {
+                            detail: {
+                                index: i,
+                                total: updatedCandidates.length,
+                                candidate: updatedCandidates[i]
+                            }
+                        }));
                     }
                 } catch (analyzeError) {
                     console.error(`Error analyzing candidate ${candidate.name}:`, analyzeError);
@@ -497,6 +566,21 @@ const analyzeCandidates = async () => {
         }
 
         setCandidates(updatedCandidates);
+        console.log("Final analysis results for all candidates:", updatedCandidates);
+
+        // Dispatch a custom event with the analysis results to be caught by the dashboard
+        const analysisEvent = new CustomEvent('candidateAnalysisComplete', {
+            detail: {
+                candidates: updatedCandidates,
+                jobName: jobs.find(job => job.slug === selectedJob)?.name || 'Selected Job',
+                hiringStage: hiringStages.find(stage => stage.status_id.toString() === selectedHiringStage)?.label,
+                dateRange: dateRange,
+                totalCandidates: updatedCandidates.length,
+                suitableCandidates: updatedCandidates.filter(c => c.resumeAnalysis?.suitable).length
+            }
+        });
+        window.dispatchEvent(analysisEvent);
+        
     } catch (error) {
         console.error('Error analyzing candidates:', error);
         alert('Failed to analyze candidates');
@@ -555,8 +639,10 @@ const fetchJobs = React.useCallback(async () => {
         setLoading(true);
         const response = await fetch('/api/jobs');
         if (!response.ok) throw new Error('Failed to fetch jobs');
-        const data = await response.json();
-        setJobs(data.data || []);
+        const data = await response.json();     
+        console.log(data)
+        setJobs(data.data.data || []);
+        setHiringStages(data.hiringstagesData || []);
     } catch (error) {
         console.error('Error fetching jobs:', error);
     } finally {
@@ -568,10 +654,21 @@ React.useEffect(() => {
     fetchJobs();
 }, [])
 
+// Add a new useEffect to scroll to candidates section after fetching
+React.useEffect(() => {
+    if (!fetchingCandidates && candidates.length > 0) {
+        // Find the candidates wrapper element and scroll to it
+        const candidatesSection = document.querySelector('.fetched_candidates_wrapper');
+        if (candidatesSection) {
+            candidatesSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+}, [fetchingCandidates, candidates]);
+
 const handleSheetOpenChange = (open: boolean) => {
   setSheetOpen(open)
-  // When sheet is closed, reset form values
-  if (!open) {
+  // Only reset values when opening the sheet and candidates are not already loaded
+  if (open && candidates.length === 0) {
     setSelectedJob('')
     setDateRange(undefined)
   }
@@ -579,11 +676,11 @@ const handleSheetOpenChange = (open: boolean) => {
 
   return (
     <>
-      <nav className="flex flex-row justify-between items-center p-4 bg-[#171717] border-b border-[#2E2E2E]">
+      <nav className="flex flex-row justify-between items-center p-4 bg-[#171717] border-b border-[#2E2E2E] sticky top-0 z-10">
         <div className="logo_wrapper">
           <Link href="/" className="flex flex-row items-center gap-2">
-            <SparklesIcon className="size-5 text-[#fafafa]" />
-            <span className="text-[#FAFAFA]">Candidate analyser</span>
+            {/* <SparklesIcon className="size-5 text-[#fafafa]" /> */}
+            <span className="text-[#FAFAFA]">CandidateX</span>
           </Link>
         </div>
 
@@ -606,7 +703,7 @@ const handleSheetOpenChange = (open: boolean) => {
                 Start analysis
               </button>
                 </SheetTrigger>
-                <SheetContent className="bg-[#171717] border-l border-[#2E2E2E] p-0 w-[40%] max-w-[40%] sm:max-w-[40%] flex flex-col">
+                <SheetContent className="bg-[#171717] border-l border-[#2E2E2E] p-0 w-[40%] max-w-[40%] sm:max-w-[40%] flex flex-col overflow-y-auto">
                   <SheetHeader className="p-4 border-b border-[#2E2E2E]">
                     <SheetTitle className="text-[#FAFAFA] text-lg font-medium">Start a new analysis</SheetTitle>
                     {/* <SheetDescription className="text-[#B4B4B4] text-sm">
@@ -627,7 +724,7 @@ const handleSheetOpenChange = (open: boolean) => {
                                   disabled={loading}
                               >
                                   <SelectTrigger className="w-2/4 bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-10">
-                                      <SelectValue placeholder="Select a job" />
+                                      <SelectValue placeholder="e.g. Designer" />
                                   </SelectTrigger>
                                   <SelectContent className="bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#B4B4B4] [&>*]:bg-[#1F1F1F]">
                                       <SelectGroup className=" bg-[#1F1F1F]">
@@ -638,6 +735,35 @@ const handleSheetOpenChange = (open: boolean) => {
                                                   className="bg-[#1F1F1F] text-[#CECECE] my-1 cursor-pointer hover:bg-[#2E2E2E] data-[highlighted]:bg-[#2E2E2E] data-[highlighted]:text-white rounded-md hover:text-[#CECECE]"
                                               >
                                                   {job.name}
+                                              </SelectItem>
+                                          ))}
+                                      </SelectGroup>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+
+                          <div className='stage_wrapper w-full flex flex-row items-center mt-4 px-4'>
+                              <div className="flex flex-col items-start w-2/4">
+                                  <span className="text-[#FAFAFA] text-md font-semibold mb-1">Hiring stage</span>
+                                  <p className="text-[#CECECE] text-sm">Select a hiring stage to analyze</p>
+                              </div>
+                              <Select
+                                  value={selectedHiringStage}
+                                  onValueChange={setSelectedHiringStage}
+                                  disabled={loading}
+                              >
+                                  <SelectTrigger className="w-2/4 bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-10">
+                                      <SelectValue placeholder="e.g. Applied" />
+                                  </SelectTrigger>
+                                  <SelectContent className="bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#B4B4B4] [&>*]:bg-[#1F1F1F]">
+                                      <SelectGroup className=" bg-[#1F1F1F]">
+                                          {hiringStages.map((stage) => (
+                                              <SelectItem 
+                                                  key={stage.status_id} 
+                                                  value={stage.status_id.toString()} 
+                                                  className="bg-[#1F1F1F] text-[#CECECE] my-1 cursor-pointer hover:bg-[#2E2E2E] data-[highlighted]:bg-[#2E2E2E] data-[highlighted]:text-white rounded-md hover:text-[#CECECE]"
+                                              >
+                                                  {stage.label}
                                               </SelectItem>
                                           ))}
                                       </SelectGroup>
@@ -658,6 +784,10 @@ const handleSheetOpenChange = (open: boolean) => {
                               </div>
                           </div>
 
+
+                          {/* Only show candidates section after fetch attempt */}
+                          {(fetchingCandidates || candidates.length > 0 || fetchedCandidatesCount !== null) && (
+                          <div>
                           <div className='fetched_candidates_wrapper w-full mt-4 border-t border-[#2E2E2E] p-4'>
                             <span className="text-[#FAFAFA] text-md font-semibold">
                               {fetchingCandidates 
@@ -680,29 +810,29 @@ const handleSheetOpenChange = (open: boolean) => {
                                   : 'Please select a job and date range to fetch candidates'}
                             </p>
                               <div className="candidates_list_wrapper w-full">
-                              <Table className="w-full p-0 m-0">
-                                    <TableHeader>
-                                        <TableRow>
-                                        <TableHead className="text-[#B4B4B4] w-[250px]">Candidate</TableHead>
-                                        <TableHead className="text-[#B4B4B4]">Status</TableHead>
-                                        <TableHead className="text-[#B4B4B4]">Resume</TableHead>
+                              <Table className="w-full p-0 mt-4">
+                                    <TableHeader className="bg-[#1F1F1F] rounded-t-md">
+                                        <TableRow className="border-b border-[#2E2E2E] hover:bg-[#1F1F1F]">
+                                        <TableHead className="text-[#B4B4B4] w-[250px] font-medium">Candidate</TableHead>
+                                        <TableHead className="text-[#B4B4B4] font-medium">Status</TableHead>
+                                        <TableHead className="text-[#B4B4B4] font-medium">Resume</TableHead>
                                         </TableRow>
                                     </TableHeader>
-                                    <TableBody>
+                                    <TableBody className="bg-[#171717]">
                                         {fetchingCandidates ? (
-                                            <TableRow>
+                                            <TableRow className="border-b border-[#2E2E2E] hover:bg-[#1F1F1F]">
                                                 <TableCell colSpan={4} className="text-center text-[#B4B4B4] py-8">
                                                     <div className="flex flex-col items-center justify-center gap-2">
-                                                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#00623A]"></div>
+                                                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#2CB46D]"></div>
                                                         <span>Loading candidates...</span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         ) : candidates.length > 0 ? (
-                                            candidates.slice(0, 5).map((candidate) => (
-                                                <TableRow key={candidate.id} className="hover:bg-[#1F1F1F] cursor-pointer">
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-3">
+                                            candidates.map((candidate) => (
+                                                <TableRow key={candidate.id} className="border-b border-[#2E2E2E] hover:bg-[#1F1F1F] cursor-pointer">
+                                                    <TableCell className="py-3">
+                                                        <div className="flex items-start gap-3">
                                                             {candidate.avatar ? (
                                                                 <Image 
                                                                     src={candidate.avatar} 
@@ -719,10 +849,15 @@ const handleSheetOpenChange = (open: boolean) => {
                                                             <div className="flex flex-col">
                                                                 <span className="font-medium text-[#FAFAFA]">{candidate.name}</span>
                                                                 <span className="text-[#B4B4B4] text-xs">{candidate.email}</span>
+                                                                {(candidate.current_organization) && (
+                                                                    <span className="text-[#8A8A8A] text-xs mt-1">
+                                                                        {candidate.current_organization}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="py-3">
                                                         <span className={`px-2 py-1 rounded-full text-xs ${
                                                             candidate.status === 'Active' ? 'bg-[#143C2E] text-[#2CB46D]' : 
                                                             candidate.status === 'Inactive' ? 'bg-[#3C2E14] text-[#B4882C]' :
@@ -731,7 +866,7 @@ const handleSheetOpenChange = (open: boolean) => {
                                                             {candidate.status}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="py-3">
                                                         {candidate.resumeLink ? (
                                                             <a 
                                                                 href={candidate.resumeLink} 
@@ -746,65 +881,85 @@ const handleSheetOpenChange = (open: boolean) => {
                                                                     <line x1="16" y1="17" x2="8" y2="17"></line>
                                                                     <polyline points="10 9 9 9 8 9"></polyline>
                                                                 </svg>
-                                                                Resume
+                                                                View Resume
                                                             </a>
                                                         ) : (
                                                             <span className="text-[#8A8A8A] text-xs">No resume available</span>
                                                         )}
                                                     </TableCell>
-                                                   
                                                 </TableRow>
                                             ))
                                         ) : selectedJob && dateRange?.from && dateRange?.to ? (
-                                            <TableRow>
+                                            <TableRow className="border-b border-[#2E2E2E]">
                                                 <TableCell colSpan={4} className="text-center text-[#B4B4B4] py-8">
                                                     No candidates found for the selected criteria
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            <TableRow>
+                                            <TableRow className="border-b border-[#2E2E2E]">
                                                 <TableCell colSpan={4} className="text-center text-[#B4B4B4] py-8">
                                                     {!selectedJob ? 'Select a job to view candidates' : 'Select a date range to view candidates'}
                                                 </TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
-                                    {candidates.length > 5 && (
-                                        <TableFooter>
-                                            <TableRow>
-                                                <TableCell colSpan={4} className="text-right text-[#B4B4B4]">
-                                                    <div className="flex justify-between items-center">
-                                                        <span>{candidates.length} total candidates found</span>
-                                                        <span>{candidates.length - 5} more candidates not shown</span>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableFooter>
-                                    )}
+                                    
                                 </Table>
                               </div>
                           </div>
+
+                          <div className='addional_wrapper flex flex-row w-full border-t border-[#2E2E2E] p-4'>
+                              <div className="flex flex-col items-start w-2/4">
+                                  <span className="text-[#FAFAFA] text-md font-semibold mb-1">Job description</span>
+                                  <p className="text-[#CECECE] text-sm">The job description from Recruit CRM is auto-fetched. This field is optional.</p>
+                              </div>
+                              <div className="w-2/4">
+                                  <Textarea
+                                    className={`w-full bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-32`}
+                                    placeholder="Additional job requirements (Optional)"
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
+                                  />
+                              </div>
+                          </div>
+                          
+                          </div>
+                          )}
+
+
+                          
                       </div>
                     </div>
                     
                     <div className="p-4 mt-auto border-t border-[#2E2E2E] bg-[#171717] sticky bottom-0 w-full">
-                     
-                          <Button 
+                      {candidates.length === 0 ? (
+                        <Button 
                           variant={"default"}
-                            type="submit" 
-                            className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
-                            disabled={fetchingCandidates || !selectedJob || !(dateRange?.from && dateRange?.to)}
-                          >
-                              {fetchingCandidates ? 'Fetching Candidates...' : candidates.length > 0 ? 'Update Candidates' : 'Fetch Candidates'}
-                          </Button>
+                          type="submit" 
+                          className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
+                          disabled={fetchingCandidates || !selectedJob}
+                        >
+                          {fetchingCandidates ? 'Fetching Candidates...' : 'Fetch Candidates'}
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant={"default"}
+                          type="submit" 
+                          className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
+                          disabled={fetchingCandidates || analyzingCandidates}
+                        >
+                          {analyzingCandidates ? 'Analysing candidates...' : 'Analyse Candidates'}
+                        </Button>
+                      )}
                       {!fetchingCandidates && (
                         <p className="text-[#8A8A8A] text-xs mt-2 text-center">
                           {!selectedJob ? 'Please select a job role' : 
-                           !(dateRange?.from && dateRange?.to) ? 'Please select a date range' : 
-                           candidates.length > 0 ? `${candidates.length} candidates fetched successfully` :
-                           `Ready to fetch candidates for ${jobs.find(job => job.slug === selectedJob)?.name || selectedJob} from ${dateRange?.from ? format(dateRange.from, "MMM dd, yyyy") : ""} to ${dateRange?.to ? format(dateRange.to, "MMM dd, yyyy") : ""}`}
+                           candidates.length > 0 ? `${candidates.length} candidates fetched successfully${selectedHiringStage ? ` from "${hiringStages.find(stage => stage.status_id.toString() === selectedHiringStage)?.label || 'Selected'}" stage` : ''}` :
+                           `Ready to fetch candidates for ${jobs.find(job => job.slug === selectedJob)?.name || selectedJob}${selectedHiringStage ? ` in "${hiringStages.find(stage => stage.status_id.toString() === selectedHiringStage)?.label || 'Selected'}" stage` : ''}${(dateRange?.from && dateRange?.to) ? ` from ${format(dateRange.from, "MMM dd, yyyy")} to ${format(dateRange.to, "MMM dd, yyyy")}` : ''}`}
                         </p>
                       )}
+                      {/* Only show filter pills before candidates are fetched */}
+                     
                     </div>
                   </form>
                 </SheetContent>
