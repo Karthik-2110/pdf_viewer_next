@@ -12,12 +12,21 @@ export async function GET() {
       }
     });
 
+    const hiringstages = await fetch(`${BASE_URL}/hiring-pipelines/0`, {
+      headers: {
+        'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const hiringstagesData = await hiringstages.json();
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return NextResponse.json({ data, hiringstagesData });
   } catch (error) {
     console.error('Error fetching jobs:', error);
     return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });

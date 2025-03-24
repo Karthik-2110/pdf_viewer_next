@@ -5,7 +5,19 @@ const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
 
 export async function POST(request: Request) {
   try {
-    const { jobDescription, resumeText } = await request.json();
+    // Read the request body only once
+    const requestData = await request.json();
+    const { 
+      jobDescription, 
+      text, 
+      jobSlug, 
+      candidateSlug, 
+      skills, 
+      specialization, 
+      salary_expectation, 
+      current_salary, 
+      selectedJobInfo 
+    } = requestData;
     
     // Check if OpenAI API key is available
     const apiKey = process.env.OPENAI_API_KEY;
@@ -34,29 +46,17 @@ export async function POST(request: Request) {
       });
     }
     
-    //                               text: candidate.resumeText,
-    //                               jobDescription: jobDescription,
-    //                               jobSlug: selectedJob,
-    //                               candidateSlug: candidate.slug,
-    //                               skills: candidate.skills[0],
-    //                               specialization: candidate.specialization,
-    //                               salary_expectation: candidate.salary_expectation,
-    //                               current_salary: candidate.current_salary,
-    //                               selectedJobInfo: selectedJobInfo
-    const { text, jobSlug, candidateSlug, skills, specialization, salary_expectation, current_salary, selectedJobInfo } = await request.json();
-    
     // console.log('Analyzing resume content...');
     // console.log('Resume text length:', text.length);
     // console.log('Job description provided:', !!jobDescription);
     
     const systemPrompt = `You are an expert hiring manager evaluating candidates for a position. 
-Analyze the candidate's information and resume against the job description and it should be strict and provide a
-detailed assessment in JSON format. The result should be either 'approved' or 'declined'. no reason or no other datas
-needed just return 'approved' or 'declined' in a json format - this should not change and no other datas needed`;
+Analyze the candidate's information and resume against the job description then understand the candidate's skills and experience don't just match the key words in the job description make sure you are doing more human level thinking while processing and Emphaty is important and it should be strict and reject the candidates if they have made more than 4 grammatical errors and provide a
+detailed assessment in JSON format. The result should be either 'approved' or 'declined'.  just return 'approved' or 'declined' and why as a reason in a json format - this should not change and no other datas needed`;
 
     // console.log('Using system prompt for detailed analysis');
 
-    const jobDescriptionText = jobDescription || selectedJobInfo.job_description_text || "Not provided";
+    const jobDescriptionText = jobDescription && selectedJobInfo?.job_description_text || "Not provided";
     const candidateData = { resume: text, id: candidateSlug }; // Ensure candidateData has an id property
 
     // Process each candidate individually with a delay for thorough evaluation
@@ -65,7 +65,7 @@ needed just return 'approved' or 'declined' in a json format - this should not c
         { role: 'user', content: `${systemPrompt} Job Description: ${jobDescriptionText} Candidate Data: ${JSON.stringify(candidateData)} ${skills} ${specialization} ${salary_expectation} ${current_salary}` }
       ],
       model: "gpt-4-turbo",
-      temperature: 0.7,
+      temperature: 0.4,
       response_format: { type: "json_object" }
     });
 
@@ -79,7 +79,7 @@ needed just return 'approved' or 'declined' in a json format - this should not c
       const resultObject = JSON.parse(resultJson);
      
       if (resultObject.result === 'approved') {
-        console.log( 'Approved ' + resultObject.result)
+        console.log('Approved', JSON.stringify(completion.choices[0].message))
         // Update candidate hiring stage to recommended
         await fetch(`https://api.recruitcrm.io/v1/candidates/${candidateSlug}/hiring-stages/${jobSlug}`, {
           method: 'POST',
@@ -89,9 +89,9 @@ needed just return 'approved' or 'declined' in a json format - this should not c
             remark: 'Updated'
           })
         });
-        return NextResponse.json({ score: 100, status: "Approved", suitable: true, summary: "Candidate approved by AI", coldEmail: "" });
+        return NextResponse.json({ score: 100, status: "Approved", suitable: true, summary: "Candidate approved by AI" });
       } else if (resultObject.result === 'declined') {
-        console.log( 'Declined ' + resultObject.result)
+        console.log('Declined', JSON.stringify(completion.choices[0].message))
         // Update candidate hiring stage to rejected
         await fetch(`https://api.recruitcrm.io/v1/candidates/${candidateSlug}/hiring-stages/${jobSlug}`, {
           method: 'POST',
@@ -101,9 +101,9 @@ needed just return 'approved' or 'declined' in a json format - this should not c
             remark: 'Updated'
           })
         });
-        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Candidate declined by AI", coldEmail: "" });
+        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Candidate declined by AI"});
       } else {
-        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Error analyzing resume", coldEmail: "" });
+        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Error analyzing resume" });
       }
     } catch (error) {
       console.error('Error parsing JSON response:', error);

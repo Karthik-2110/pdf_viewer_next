@@ -10,6 +10,11 @@
   }
 } */
 
+/* Global smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Add to your global CSS */
 .recharts-tooltip-cursor {
   display: none !important;
@@ -20,6 +25,22 @@
   /* This brightens the bar slightly on hover instead of showing a white background */
 }
 
+/* Hide scrollbars globally while maintaining scroll functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbars for Chrome, Safari and Opera */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ensure elements with overflow can still be scrolled */
+[class*="overflow-"], .overflow-auto, .overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
 
 
 @layer base {
