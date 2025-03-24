@@ -232,10 +232,25 @@ interface CandidateData {
   };
 }
 
-const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
+// Removing the hardcoded API key
+// const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
 const RECRUIT_CRM_BASE_URL = 'https://api.recruitcrm.io/v1';
 
-
+// Function to fetch API key from the server
+const fetchApiKey = async (): Promise<string> => {
+  try {
+    const response = await fetch('/api/apikey');
+    if (!response.ok) {
+      console.error('Failed to fetch API key');
+      return '';
+    }
+    const data = await response.json();
+    return data.apiKey;
+  } catch (error) {
+    console.error('Error fetching API key:', error);
+    return '';
+  }
+};
 
 export default function Navbar() {
     const { data: session } = useSession()
@@ -260,6 +275,16 @@ const [sendingEmail, setSendingEmail] = React.useState(false);
 const [recipientEmail, setRecipientEmail] = React.useState<string>('');
 const [emailSent, setEmailSent] = React.useState(false);
 const [sheetOpen, setSheetOpen] = React.useState(false)
+const [apiKey, setApiKey] = React.useState<string>(''); // Store the API key
+
+// Fetch the API key when component mounts
+React.useEffect(() => {
+    const getApiKey = async () => {
+        const key = await fetchApiKey();
+        setApiKey(key);
+    };
+    getApiKey();
+}, []);
 
 const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
     setDateRange(newDateRange)
@@ -283,10 +308,16 @@ const handleSubmit = async (e: React.FormEvent) => {
         setCandidates([]) // Clear previous candidates
         setFetchedCandidatesCount(null) // Reset count
 
+        // Get the API key if not already available
+        const currentApiKey = apiKey || await fetchApiKey();
+        if (!currentApiKey) {
+            throw new Error('API key not available');
+        }
+
         // Fetch selected job details based on jobSlug
         const jobDetailsResponse = await fetch(`${RECRUIT_CRM_BASE_URL}/jobs/${selectedJob}`, {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}` }
+            headers: { 'Authorization': `Bearer ${currentApiKey}` }
         });
 
         if (!jobDetailsResponse.ok) {
@@ -462,11 +493,6 @@ const handleSubmit = async (e: React.FormEvent) => {
 const analyzeCandidates = async () => {
     if (candidates.length === 0) {
         alert('Please fetch candidates first');
-        return;
-    }
-
-    if (!jobDescription.trim()) {
-        alert('Please enter a job description');
         return;
     }
 
@@ -885,15 +911,14 @@ const handleSheetOpenChange = (open: boolean) => {
                           <div className='addional_wrapper flex flex-row w-full border-t border-[#2E2E2E] p-4'>
                               <div className="flex flex-col items-start w-2/4">
                                   <span className="text-[#FAFAFA] text-md font-semibold mb-1">Job description</span>
-                                  <p className="text-[#CECECE] text-sm">The job description from Recruit CRM is auto-fetched. Use this field for further refinement.</p>
+                                  <p className="text-[#CECECE] text-sm">The job description from Recruit CRM is auto-fetched. This field is optional.</p>
                               </div>
                               <div className="w-2/4">
                                   <Textarea
                                     className={`w-full bg-[#1F1F1F] border border-[#2E2E2E] rounded-md text-[#CECECE] focus:border-[#2CB46D] focus:ring-[#2CB46D] hover:border-[#2CB46D] h-32`}
-                                    placeholder="Enter analyses rules"
+                                    placeholder="Additional job requirements (Optional)"
                                     value={jobDescription}
                                     onChange={(e) => setJobDescription(e.target.value)}
-                                    required
                                   />
                               </div>
                           </div>
@@ -921,7 +946,7 @@ const handleSheetOpenChange = (open: boolean) => {
                           variant={"default"}
                           type="submit" 
                           className="w-full bg-[#00623A] text-[#FAFAFA] border border-[#148253] font-semibold text-xs px-3 py-2 rounded-md flex flex-row items-center justify-center hover:bg-[#1E2823] hover:border-[#148253] hover:text-[#FAFAFA]"
-                          disabled={fetchingCandidates || jobDescription.length < 15 || analyzingCandidates}
+                          disabled={fetchingCandidates || analyzingCandidates}
                         >
                           {analyzingCandidates ? 'Analysing candidates...' : 'Analyse Candidates'}
                         </Button>
@@ -929,7 +954,6 @@ const handleSheetOpenChange = (open: boolean) => {
                       {!fetchingCandidates && (
                         <p className="text-[#8A8A8A] text-xs mt-2 text-center">
                           {!selectedJob ? 'Please select a job role' : 
-                           candidates.length > 0 && jobDescription.length < 15 ? `Please enter at least ${15 - jobDescription.length} more character${15 - jobDescription.length !== 1 ? 's' : ''} in job description` :
                            candidates.length > 0 ? `${candidates.length} candidates fetched successfully${selectedHiringStage ? ` from "${hiringStages.find(stage => stage.status_id.toString() === selectedHiringStage)?.label || 'Selected'}" stage` : ''}` :
                            `Ready to fetch candidates for ${jobs.find(job => job.slug === selectedJob)?.name || selectedJob}${selectedHiringStage ? ` in "${hiringStages.find(stage => stage.status_id.toString() === selectedHiringStage)?.label || 'Selected'}" stage` : ''}${(dateRange?.from && dateRange?.to) ? ` from ${format(dateRange.from, "MMM dd, yyyy")} to ${format(dateRange.to, "MMM dd, yyyy")}` : ''}`}
                         </p>

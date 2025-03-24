@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import fetch from 'node-fetch';
+import { getRecruitApiKey } from '@/utils/supabase-api';
 
-const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
+// Removing direct reference to environment variable
+// const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
 const BASE_URL = 'https://api.recruitcrm.io/v1';
 
 interface StageData {
@@ -45,8 +47,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Job slug is required' }, { status: 400 });
     }
 
+    // Fetch API key from Supabase
+    const RECRUIT_CRM_API_KEY = await getRecruitApiKey();
+
     if (!RECRUIT_CRM_API_KEY) {
-      console.error('CRITICAL: RecruitCRM API Key is not set');
+      console.error('CRITICAL: RecruitCRM API Key is not available');
       return NextResponse.json({ error: 'API configuration error' }, { status: 500 });
     }
 

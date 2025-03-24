@@ -548,7 +548,7 @@ export default function Dashboard() {
                     {/* Empty State Section - Show when no analysis is in progress and no results exist */}
                     {!analysisResults && !isAnalysisInProgress && (
                         <div className="empty-state">
-                            <div className="bg-[#1F1F1F] rounded-lg p-8 border border-[#2E2E2E]">
+                            <div className="wrapper">
                                 <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
                                     <div className="w-20 h-20 rounded-full bg-[#143C2E] flex items-center justify-center mb-6">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#2CB46D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -615,35 +615,6 @@ export default function Dashboard() {
                                                 <h3 className="text-[#FAFAFA] text-lg font-medium">AI-Powered Insights</h3>
                                             </div>
                                             <p className="text-[#B4B4B4] text-sm ml-13">Advanced AI evaluates candidate suitability using context-aware analysis of resumes against your specific job requirements.</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="bg-[#1A1A1A] p-6 rounded-lg border border-[#2E2E2E] w-full mb-8">
-                                        <h3 className="text-[#FAFAFA] text-lg font-medium mb-4">How It Works</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <div className="flex flex-col items-center text-center p-4">
-                                                <div className="w-10 h-10 rounded-full bg-[#143C2E] flex items-center justify-center mb-3">
-                                                    <span className="text-[#2CB46D] font-semibold">1</span>
-                                                </div>
-                                                <h4 className="text-[#FAFAFA] font-medium mb-2">Select Job Role</h4>
-                                                <p className="text-[#B4B4B4] text-sm">Choose a job listing from your Recruit CRM account to analyze candidates.</p>
-                                            </div>
-                                            
-                                            <div className="flex flex-col items-center text-center p-4">
-                                                <div className="w-10 h-10 rounded-full bg-[#143C2E] flex items-center justify-center mb-3">
-                                                    <span className="text-[#2CB46D] font-semibold">2</span>
-                                                </div>
-                                                <h4 className="text-[#FAFAFA] font-medium mb-2">Refine Requirements</h4>
-                                                <p className="text-[#B4B4B4] text-sm">Review and enhance the auto-fetched job description to focus on key requirements.</p>
-                                            </div>
-                                            
-                                            <div className="flex flex-col items-center text-center p-4">
-                                                <div className="w-10 h-10 rounded-full bg-[#143C2E] flex items-center justify-center mb-3">
-                                                    <span className="text-[#2CB46D] font-semibold">3</span>
-                                                </div>
-                                                <h4 className="text-[#FAFAFA] font-medium mb-2">Get Results</h4>
-                                                <p className="text-[#B4B4B4] text-sm">Receive detailed analysis with candidate rankings, suitability scores, and skill matches.</p>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -814,7 +785,7 @@ export default function Dashboard() {
                                                                         ? 'bg-[#143C2E] text-[#2CB46D]' 
                                                                         : 'bg-[#3C2E14] text-[#EAAB0F]'
                                                                 }`}>
-                                                                    {candidate.resumeAnalysis.suitable ? 'Suitable' : 'Not Suitable'}
+                                                                    {candidate.resumeAnalysis.suitable ? 'Recommended by AI' : 'Rejected by AI'}
                                                                 </span>
                                                             ) : (
                                                                 <span className="text-[#8A8A8A] text-xs">Not analyzed</span>
@@ -853,9 +824,6 @@ export default function Dashboard() {
                                                                             <polyline points="10 9 9 9 8 9"></polyline>
                                                                         </svg>
                                                                         Detailed Summary
-                                                                        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-[#232323] text-[#CECECE] px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                                                            View detailed candidate assessment
-                                                                        </span>
                                                                     </button>
                                                                 )}
                                                             </div>

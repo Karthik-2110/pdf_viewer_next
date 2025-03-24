@@ -182,7 +182,24 @@ interface CandidateData {
     };
 }
 
-const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
+// Function to fetch API key from the server
+const fetchApiKey = async (): Promise<string> => {
+  try {
+    const response = await fetch('/api/apikey');
+    if (!response.ok) {
+      console.error('Failed to fetch API key');
+      return '';
+    }
+    const data = await response.json();
+    return data.apiKey;
+  } catch (error) {
+    console.error('Error fetching API key:', error);
+    return '';
+  }
+};
+
+// Remove the hardcoded API key
+// const RECRUIT_CRM_API_KEY = "uLMA7yLGleZcTV6SvclZaci4s4BEl4J487S3CbiueVsnLtKaUNc1FqBWATMLTca29vyW8Wwb6WMrwTkGPm8N_V8xNzQwMTUyNTk2Onw6cHJvZHVjdGlvbg==";
 const RECRUIT_CRM_BASE_URL = 'https://api.recruitcrm.io/v1';
 
 export default function Home() {
@@ -204,6 +221,16 @@ export default function Home() {
     const [sendingEmail, setSendingEmail] = React.useState(false);
     const [recipientEmail, setRecipientEmail] = React.useState<string>('');
     const [emailSent, setEmailSent] = React.useState(false);
+    const [apiKey, setApiKey] = React.useState<string>(''); // Store the API key
+
+    // Fetch the API key when component mounts
+    React.useEffect(() => {
+        const getApiKey = async () => {
+            const key = await fetchApiKey();
+            setApiKey(key);
+        };
+        getApiKey();
+    }, []);
 
     const handleDateRangeChange = (newDateRange: DateRange | undefined) => {
         setDateRange(newDateRange)
@@ -219,12 +246,18 @@ export default function Home() {
         try {
             setFetchingCandidates(true)
 
+            // Get the API key if not already available
+            const currentApiKey = apiKey || await fetchApiKey();
+            if (!currentApiKey) {
+                throw new Error('API key not available');
+            }
+
             // Fetch selected job details based on jobSlug
             // console.log(RECRUIT_CRM_API_KEY)
            
             const jobDetailsResponse = await fetch(`${RECRUIT_CRM_BASE_URL}/jobs/${selectedJob}`, {
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}` }
+                headers: { 'Authorization': `Bearer ${currentApiKey}` }
             });
 
             const jobDetails = await jobDetailsResponse.json();

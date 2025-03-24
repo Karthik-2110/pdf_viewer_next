@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getRecruitApiKey } from '@/utils/supabase-api';
 
-const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
+// Removing direct reference to environment variable
+// const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
 
 export async function POST(request: Request) {
   try {
@@ -51,12 +53,30 @@ export async function POST(request: Request) {
     // console.log('Job description provided:', !!jobDescription);
     
     const systemPrompt = `You are an expert hiring manager evaluating candidates for a position. 
-Analyze the candidate's information and resume against the job description then understand the candidate's skills and experience don't just match the key words in the job description make sure you are doing more human level thinking while processing and Emphaty is important and it should be strict and reject the candidates if they have made more than 4 grammatical errors and provide a
-detailed assessment in JSON format. The result should be either 'approved' or 'declined'.  just return 'approved' or 'declined' and why as a reason in a json format - this should not change and no other datas needed`;
+Analyze the candidate's information and resume against the job description then understand the candidate's skills and experience.
+Don't just match keywords in the job description - perform a human-level evaluation that considers context and suitability.
+candidates with more than 4 grammatical errors should be rejected. consider the candidate if the have relevant educational qualifications or background and skills. make sure the candidate has relevant experience for the job.
+
+Your response MUST be in JSON format with exactly these fields:
+{
+  "result": "approved" or "declined",
+  "reason": "A clear and specific explanation of why the candidate was approved or declined"
+}
+
+Provide detailed reasoning for your decision that explains the specific qualifications, skills, or issues that led to your conclusion.`;
 
     // console.log('Using system prompt for detailed analysis');
 
-    const jobDescriptionText = jobDescription && selectedJobInfo?.job_description_text || "Not provided";
+    // Prioritize selectedJobInfo.job_description_text if jobDescription is empty
+    const jobDescriptionText = jobDescription?.trim() 
+      ? jobDescription
+      : selectedJobInfo?.job_description_text 
+      ? selectedJobInfo.job_description_text 
+      : "Not provided";
+      
+    // Log for debugging
+    console.log('Using job description:', jobDescriptionText.substring(0, 100) + '...');
+    
     const candidateData = { resume: text, id: candidateSlug }; // Ensure candidateData has an id property
 
     // Process each candidate individually with a delay for thorough evaluation
@@ -77,6 +97,17 @@ detailed assessment in JSON format. The result should be either 'approved' or 'd
     try {
       // Parse the JSON response
       const resultObject = JSON.parse(resultJson);
+      
+      // Get the reason from the AI response or use a default message
+      const reasonText = resultObject.reason || "No specific reason provided";
+      
+      // Fetch API key from Supabase
+      const RECRUIT_CRM_API_KEY = await getRecruitApiKey();
+      
+      if (!RECRUIT_CRM_API_KEY) {
+        console.error('CRITICAL: RecruitCRM API Key is not available');
+        return NextResponse.json({ error: 'API configuration error' }, { status: 500 });
+      }
      
       if (resultObject.result === 'approved') {
         console.log('Approved', JSON.stringify(completion.choices[0].message))
@@ -86,10 +117,16 @@ detailed assessment in JSON format. The result should be either 'approved' or 'd
           headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             status_id: 523721,
-            remark: 'Updated'
+            remark: reasonText
           })
         });
-        return NextResponse.json({ score: 100, status: "Approved", suitable: true, summary: "Candidate approved by AI" });
+        return NextResponse.json({ 
+          score: 100, 
+          status: "Approved", 
+          suitable: true, 
+          summary: `Candidate approved: ${reasonText}`, 
+          coldEmail: "" 
+        });
       } else if (resultObject.result === 'declined') {
         console.log('Declined', JSON.stringify(completion.choices[0].message))
         // Update candidate hiring stage to rejected
@@ -98,12 +135,24 @@ detailed assessment in JSON format. The result should be either 'approved' or 'd
           headers: { 'Authorization': `Bearer ${RECRUIT_CRM_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             status_id: 523720,
-            remark: 'Updated'
+            remark: reasonText
           })
         });
-        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Candidate declined by AI"});
+        return NextResponse.json({ 
+          score: 0, 
+          status: "Declined", 
+          suitable: false, 
+          summary: `Candidate declined: ${reasonText}`, 
+          coldEmail: "" 
+        });
       } else {
-        return NextResponse.json({ score: 0, status: "Declined", suitable: false, summary: "Error analyzing resume" });
+        return NextResponse.json({ 
+          score: 0, 
+          status: "Declined", 
+          suitable: false, 
+          summary: "Error analyzing resume: Unrecognized result", 
+          coldEmail: "" 
+        });
       }
     } catch (error) {
       console.error('Error parsing JSON response:', error);
