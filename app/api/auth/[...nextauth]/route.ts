@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
  
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const handler = NextAuth({
   providers: [
     Google({
       authorization: {
@@ -11,6 +11,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           response_type: "code",
         },
       },
+      clientId: process.env.AUTH_GOOGLE_ID,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET,
     }),
   ],
 })
+
+// Export the Next.js API route handlers
+export { handler as GET, handler as POST }
