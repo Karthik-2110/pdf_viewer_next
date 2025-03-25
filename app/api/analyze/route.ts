@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     } = requestData;
     
     // Check if OpenAI API key is available
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.NEXT_OPENAI_API_KEY;
     if (!apiKey) {
       console.error('OpenAI API key is missing. Please provide it in your environment variables.');
       return NextResponse.json(
@@ -35,22 +35,6 @@ export async function POST(request: Request) {
     const openai = new OpenAI({
       apiKey: apiKey,
     });
-    
-    // Mock response for build time to avoid API calls
-    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production') {
-      // Return a mock response during build
-      return NextResponse.json({
-        score: 85,
-        status: 'qualified',
-        suitable: true,
-        summary: 'This is a placeholder response.',
-        coldEmail: 'This is a placeholder email template.'
-      });
-    }
-    
-    // console.log('Analyzing resume content...');
-    // console.log('Resume text length:', text.length);
-    // console.log('Job description provided:', !!jobDescription);
     
     const systemPrompt = `You are an expert hiring manager evaluating candidates for a position. 
 Analyze the candidate's information and resume against the job description then understand the candidate's skills and experience.
@@ -65,7 +49,6 @@ Your response MUST be in JSON format with exactly these fields:
 
 Provide detailed reasoning for your decision that explains the specific qualifications, skills, or issues that led to your conclusion.`;
 
-    // console.log('Using system prompt for detailed analysis');
 
     // Prioritize selectedJobInfo.job_description_text if jobDescription is empty
     const jobDescriptionText = jobDescription?.trim() 
@@ -90,7 +73,7 @@ Provide detailed reasoning for your decision that explains the specific qualific
     });
 
     const resultJson = completion.choices[0]?.message?.content || '{"result": "declined"}';
-    console.log(completion)
+    console.log(JSON.stringify(completion))
     
     // console.log('Analysis result received');
     
