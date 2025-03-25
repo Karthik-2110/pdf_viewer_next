@@ -6,8 +6,8 @@ import { getRecruitApiKey } from '@/utils/supabase-api';
 // @ts-ignore - TypeScript error ignore for now
 import { AnalysisJob, AnalysisResult } from '@/app/types/analysis';
 
-// Increase timeout for worker to allow for longer processing
-export const maxDuration = 300; // 5 minutes
+// Update max duration to comply with Vercel hobby plan limitations
+export const maxDuration = 60; // 60 seconds maximum for hobby plan
 
 export async function POST(request: Request) {
   try {
