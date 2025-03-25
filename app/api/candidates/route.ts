@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import fetch from 'node-fetch';
+import { getRecruitApiKey } from '@/utils/supabase-api';
 
-const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
+// Removing direct reference to environment variable
+// const RECRUIT_CRM_API_KEY = process.env.RECRUIT_CRM_API_KEY;
 const BASE_URL = 'https://api.recruitcrm.io/v1';
 
 interface StageData {
@@ -26,17 +28,30 @@ export async function GET(request: Request) {
     const jobSlug = searchParams.get('jobSlug');
     const fromDate = searchParams.get('fromDate');
     const toDate = searchParams.get('toDate');
+    const hiringStage = searchParams.get('hiringStage');
 
     // Define the target status IDs we want to filter by
-    const targetStatusIds = [1, 10]; // 1 = Assigned, 10 = Applied
-    console.log('Filtering by status IDs:', targetStatusIds);
+    let targetStatusIds: number[] = [];
+    
+    // If hiringStage is provided, use only that status ID
+    if (hiringStage) {
+      targetStatusIds = [parseInt(hiringStage, 10)];
+      console.log('Filtering by specific hiring stage ID:', hiringStage);
+    } else {
+      // Default to Assigned (1) and Applied (10) if no specific stage is requested
+      targetStatusIds = [1, 10]; // 1 = Assigned, 10 = Applied
+      console.log('Using default status IDs:', targetStatusIds);
+    }
 
     if (!jobSlug) {
       return NextResponse.json({ error: 'Job slug is required' }, { status: 400 });
     }
 
+    // Fetch API key from Supabase
+    const RECRUIT_CRM_API_KEY = await getRecruitApiKey();
+
     if (!RECRUIT_CRM_API_KEY) {
-      console.error('CRITICAL: RecruitCRM API Key is not set');
+      console.error('CRITICAL: RecruitCRM API Key is not available');
       return NextResponse.json({ error: 'API configuration error' }, { status: 500 });
     }
 
@@ -67,7 +82,7 @@ export async function GET(request: Request) {
       const url = new URL(`${BASE_URL}/jobs/${jobSlug}/assigned-candidates`);
       url.searchParams.append('status_id', statusId.toString());
       
-      // console.log(`Fetching candidates with status_id ${statusId} (${statusId === 1 ? 'Assigned' : 'Applied'})...`);
+      console.log(`Fetching candidates with status_id ${statusId}`);
       
       const candidatesResponse = await fetch(url.toString(), {
         headers: {
@@ -91,7 +106,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // console.log(`Total candidates found: ${allCandidates.length}`);
+    console.log(`Total candidates found before date filtering: ${allCandidates.length}`);
 
     // If no candidates found, return early
     if (allCandidates.length === 0) {
@@ -120,7 +135,7 @@ export async function GET(request: Request) {
         return candidateCreatedOn >= fromDateTime && candidateCreatedOn <= toDateTime;
       });
 
-      console.log('Filtered by date range:', filteredCandidates.length);
+      console.log(`Filtered by date range: ${filteredCandidates.length} of ${allCandidates.length} candidates matched`);
     }
 
     // Create a response object with filtered data
@@ -128,7 +143,9 @@ export async function GET(request: Request) {
       data: filteredCandidates,
       meta: {
         total: filteredCandidates.length,
-        filtered_by_status: targetStatusIds
+        filtered_by_status: targetStatusIds,
+        filtered_by_date: fromDate && toDate ? true : false,
+        filtered_by_specific_stage: hiringStage ? true : false
       }
     };
     
